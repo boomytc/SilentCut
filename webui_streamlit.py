@@ -337,14 +337,14 @@ def visualize_audio(original_path, processed_path):
     ax1 = fig.add_subplot(gs[0, 0])
     librosa.display.waveshow(y=y_orig, sr=sr_orig, ax=ax1)
     ax1.set_title("原始音频波形")
-    ax1.set_xlabel("时间 (秒)")
+    ax1.set_xlabel("时间 (分)")
     ax1.set_ylabel("振幅")
     
     # 绘制处理后音频波形图
     ax2 = fig.add_subplot(gs[0, 1])
     librosa.display.waveshow(y=y_proc, sr=sr_proc, ax=ax2)
     ax2.set_title("处理后音频波形")
-    ax2.set_xlabel("时间 (秒)")
+    ax2.set_xlabel("时间 (分)")
     ax2.set_ylabel("振幅")
     
     # 计算频谱图 - 原始音频
@@ -352,7 +352,7 @@ def visualize_audio(original_path, processed_path):
     D_orig = librosa.amplitude_to_db(np.abs(librosa.stft(y_orig)), ref=np.max)
     librosa.display.specshow(D_orig, sr=sr_orig, x_axis='time', y_axis='log', ax=ax3)
     ax3.set_title('原始音频频谱图')
-    ax3.set_xlabel("时间 (秒)")
+    ax3.set_xlabel("时间 (分)")
     ax3.set_ylabel("频率 (Hz)")
     
     # 计算频谱图 - 处理后音频
@@ -360,7 +360,7 @@ def visualize_audio(original_path, processed_path):
     D_proc = librosa.amplitude_to_db(np.abs(librosa.stft(y_proc)), ref=np.max)
     img = librosa.display.specshow(D_proc, sr=sr_proc, x_axis='time', y_axis='log', ax=ax4)
     ax4.set_title('处理后音频频谱图')
-    ax4.set_xlabel("时间 (秒)")
+    ax4.set_xlabel("时间 (分)")
     ax4.set_ylabel("频率 (Hz)")
     
     # 添加颜色条
