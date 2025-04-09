@@ -13,6 +13,7 @@ import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from functools import partial
 import time
+from pydub import AudioSegment
 
 # 忽略指定的警告
 warnings.filterwarnings("ignore", category=UserWarning, message="PySoundFile failed.*")
