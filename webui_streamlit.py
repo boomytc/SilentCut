@@ -62,7 +62,6 @@ with st.sidebar:
     st.subheader("关于")
     st.markdown("""
     **SilentCut** 是一个高效的音频处理工具，专注于自动检测并去除音频中的静音段。
-    适用于播客剪辑、语音预处理、数据清洗等场景。
     """)
 
 # 音频上传区域
