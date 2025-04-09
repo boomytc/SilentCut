@@ -1,2 +1,6 @@
-pyqt6
 pydub
+pyqt6
+streamlit
+librosa 
+matplotlib 
+soundfile
