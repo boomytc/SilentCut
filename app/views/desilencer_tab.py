@@ -4,7 +4,8 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QFileDialog, QTextEdit, QSpinBox, QProgressBar,
-    QRadioButton, QButtonGroup, QCheckBox, QGroupBox, QGridLayout
+    QRadioButton, QButtonGroup, QCheckBox, QGroupBox, QGridLayout,
+    QFormLayout, QSizePolicy
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -82,20 +83,22 @@ class DesilencerTabView(QWidget):
         
         # === 处理参数区域 ===
         params_group = QGroupBox("处理参数")
-        params_layout = QVBoxLayout()
+        # 使用FormLayout让标签和控件更有条理地排列
+        params_layout = QFormLayout()
         
         # 最小静音长度
-        silence_layout = QHBoxLayout()
-        silence_layout.addWidget(QLabel("最小静音长度(毫秒):"))
         self.silence_len_spinbox = QSpinBox()
         self.silence_len_spinbox.setRange(100, 10000)
         self.silence_len_spinbox.setValue(1000)
         self.silence_len_spinbox.setSingleStep(100)
-        silence_layout.addWidget(self.silence_len_spinbox)
-        silence_layout.addStretch()
+        # 添加到FormLayout
+        params_layout.addRow("最小静音长度(毫秒):", self.silence_len_spinbox)
         
         # 多进程设置（批处理模式用）
-        mp_layout = QHBoxLayout()
+        mp_widget = QWidget()
+        mp_layout = QHBoxLayout(mp_widget)
+        mp_layout.setContentsMargins(0, 0, 0, 0)
+        
         self.mp_checkbox = QCheckBox("启用多进程处理")
         self.mp_checkbox.setChecked(True)
         self.mp_cores_spinbox = QSpinBox()
@@ -103,33 +106,27 @@ class DesilencerTabView(QWidget):
         self.mp_cores_spinbox.setRange(1, 8)
         self.mp_cores_spinbox.setValue(4)
         self.mp_checkbox.toggled.connect(self._toggle_mp_spinbox)
+        
         mp_layout.addWidget(self.mp_checkbox)
         mp_layout.addWidget(QLabel("使用核心数:"))
         mp_layout.addWidget(self.mp_cores_spinbox)
         mp_layout.addStretch()
+        params_layout.addRow("", mp_widget)
         
         # 单文件并行搜索选项
-        parallel_search_layout = QHBoxLayout()
         self.parallel_search_checkbox = QCheckBox("启用并行阈值搜索（单文件模式）")
         self.parallel_search_checkbox.setChecked(True)
-        parallel_search_layout.addWidget(self.parallel_search_checkbox)
-        parallel_search_layout.addStretch()
+        params_layout.addRow("", self.parallel_search_checkbox)
         
         # 自定义阈值预设点
-        thresholds_layout = QVBoxLayout()  # 改为垂直布局更有空间
-        thresholds_label = QLabel("阈值预设点:")
-        thresholds_layout.addWidget(thresholds_label)
         self.thresholds_edit = QLineEdit()
         self.thresholds_edit.setPlaceholderText("用逗号分隔，例如: -90,-80,-70,-60,-50,-40,-30,-20")
         self.thresholds_edit.setText("-90,-80,-70,-60,-50,-40,-30,-20")
-        self.thresholds_edit.setMinimumWidth(400)  # 设置最小宽度
-        thresholds_layout.addWidget(self.thresholds_edit)
-        
-        # 添加到布局
-        params_layout.addLayout(silence_layout)
-        params_layout.addLayout(mp_layout)
-        params_layout.addLayout(parallel_search_layout)
-        params_layout.addLayout(thresholds_layout)
+        # 设置最小宽度和尺寸策略
+        self.thresholds_edit.setMinimumWidth(400)
+        # 设置SizePolicy让控件能够根据窗口尺寸自适应扩展
+        self.thresholds_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        params_layout.addRow("阈值预设点:", self.thresholds_edit)
         params_group.setLayout(params_layout)
         main_layout.addWidget(params_group)
         

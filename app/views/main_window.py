@@ -17,7 +17,7 @@ class MainWindow(QMainWindow):
         
         # 设置窗口属性
         self.setWindowTitle("SilentCut - 音频静音处理工具")
-        self.setMinimumSize(800, 600)
+        self.setMinimumSize(800, 800)
         
         # 创建中央部件
         self.central_widget = QWidget()

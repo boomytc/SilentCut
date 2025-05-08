@@ -4,6 +4,7 @@ SilentCut 应用程序入口
 import sys
 import os
 import multiprocessing
+import platform
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QFont
 
@@ -20,8 +21,17 @@ from app.controllers.waveform_controller import WaveformController
 
 def main():
     """程序主入口"""
-    # 支持多进程（在Windows系统上需要）
+    # 支持多进程
     multiprocessing.freeze_support()
+    
+    # 在 macOS 上显式设置多进程启动模式为 'spawn'
+    # 这避免了在 PyQt 应用中使用默认的 'fork' 模式可能导致的问题
+    if platform.system() == 'Darwin':  # Darwin 是 macOS 的系统名
+        try:
+            multiprocessing.set_start_method('spawn', force=True)
+        except RuntimeError:
+            # 如果已经设置过启动模式，可能会抛出异常，忽略它
+            pass
     
     # 创建应用程序
     app = QApplication(sys.argv)

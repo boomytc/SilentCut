@@ -4,6 +4,9 @@
 import os
 import time
 import multiprocessing
+import tempfile
+import shutil
+import uuid
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from PyQt6.QtCore import QObject, pyqtSignal, QThread
@@ -242,6 +245,10 @@ class Worker(QThread):
     def process_single_file_parallel(self, input_file, output_dir):
         """使用并行阈值搜索处理单个文件"""
         start_time = time.time()
+        # 创建临时目录管理所有临时文件
+        temp_dir = tempfile.TemporaryDirectory(prefix="silentcut_")
+        self.log_signal.emit(f"创建临时目录: {temp_dir.name}")
+        # 在函数结束时会自动清理这个目录
         
         # 发送进度信号 (0%)
         self.progress_signal.emit(0)
@@ -262,7 +269,8 @@ class Worker(QThread):
             # 准备阈值测试任务
             tasks = []
             for threshold in self.preset_thresholds:
-                tasks.append((input_file, threshold, self.min_silence_len, output_dir))
+                # 使用临时目录而不是输出目录进行阈值测试
+                tasks.append((input_file, threshold, self.min_silence_len, temp_dir.name))
             
             # 并行测试所有阈值点
             valid_results = []
@@ -367,35 +375,6 @@ class Worker(QThread):
                 # 合并并导出
                 output_audio = sum(chunks)
                 output_audio.export(output_path, format="wav")
-                
-                final_size = os.path.getsize(output_path)
-                actual_ratio = final_size / input_size
-                actual_reduction = ((input_size - final_size) / input_size * 100)
-                actual_retention = actual_ratio * 100
-                
-                # 处理完成，计算时间
-                elapsed_time = time.time() - start_time
-                
-                # 更新处理详情
-                self.processing_detail_signal.emit({
-                    "process_time": f"{elapsed_time:.2f} 秒",
-                    "threshold": f"{best_threshold:.1f} dBFS",
-                    "ratio": f"{actual_retention:.1f}%",
-                })
-                
-                # 发送完成信号 (100%)
-                self.progress_signal.emit(100)
-                
-                # 构建结果消息
-                result_message = (
-                    f"{output_path} (阈值: {best_threshold:.1f} dBFS, "
-                    f"大小: {input_size} -> {final_size} bytes, "
-                    f"减少: {actual_reduction:.2f}%, "
-                    f"保留: {actual_retention:.2f}%)"
-                )
-                
-                # 清理临时文件
-                self._clean_temp_files(temp_files)
                 
                 self.log_signal.emit(f"处理成功完成: {result_message}")
                 self.finished_signal.emit(True, result_message)
