@@ -375,10 +375,15 @@ class Worker(QThread):
                 # 合并并导出
                 output_audio = sum(chunks)
                 output_audio.export(output_path, format="wav")
-                
+ 
+                # 构造结果消息，包含关键信息
+                result_message = (
+                    f"处理完成，输出文件: {output_path} "
+                    f"(阈值: {best_threshold} dBFS, 比例 {best_result['ratio']:.2f})"
+                )
                 self.log_signal.emit(f"处理成功完成: {result_message}")
                 self.finished_signal.emit(True, result_message)
-                
+                 
                 return True, result_message
             else:
                 error_msg = f"未找到合适的阈值处理文件 {basename}"

@@ -5,6 +5,46 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 import numpy as np
+import matplotlib
+import platform
+
+# ----------------- Matplotlib 中文字体配置 ------------------ #
+
+def _configure_matplotlib_fonts():
+    """根据操作系统为 Matplotlib 设置默认的可用中文字体。"""
+    os_name = platform.system()
+
+    if os_name == "Windows":
+        # Windows 常见中文字体（SimHei/微软雅黑）
+        candidates = [
+            "SimHei",         # 黑体
+            "Microsoft YaHei",  # 微软雅黑
+            "Arial Unicode MS",  # 覆盖大部分字符
+        ]
+    elif os_name == "Darwin":  # macOS
+        candidates = [
+            "PingFang SC",    # 系统默认中文字体
+            "Hiragino Sans GB",  # 10.15 之前系统字体
+            "Heiti SC",       # 老系统黑体
+            "Arial Unicode MS",
+        ]
+    else:  # Linux
+        candidates = [
+            "Noto Sans CJK SC",  # Noto 字体系列
+            "WenQuanYi Zen Hei", # 文泉驿
+            "SimHei",
+        ]
+
+    # 追加 DejaVu Sans 作为兜底，确保西文符号正常
+    font_list = candidates + ["DejaVu Sans"]
+
+    matplotlib.rcParams["font.family"] = "sans-serif"
+    matplotlib.rcParams["font.sans-serif"] = font_list
+    # 解决负号无法显示
+    matplotlib.rcParams["axes.unicode_minus"] = False
+
+# 仅在第一次导入时执行一次
+_configure_matplotlib_fonts()
 
 
 class MplCanvas(FigureCanvasQTAgg):
