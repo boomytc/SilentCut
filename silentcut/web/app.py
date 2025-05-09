@@ -82,7 +82,7 @@ with st.sidebar:
         "最小静音长度 (ms)",
         min_value=100,
         max_value=5000,
-        value=500,
+        value=1000,
         step=100,
         help="小于此长度的静音片段将被保留"
     )
