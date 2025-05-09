@@ -1,8 +1,10 @@
 """
 SilentCut Web 界面 - 基于 Streamlit 的 Web 应用
 """
-import streamlit as st
 import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+import streamlit as st
 import tempfile
 import librosa
 import librosa.display
@@ -16,6 +18,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from functools import partial
 import time
 from pydub import AudioSegment
+import platform  # 新增，用于根据系统设置中文字体
 
 # 导入 SilentCut 核心模块
 from silentcut.audio.processor import AudioProcessor
@@ -30,9 +33,32 @@ warnings.filterwarnings("ignore", category=UserWarning, message="PySoundFile fai
 warnings.filterwarnings("ignore", category=FutureWarning, message="librosa.core.audio.__audioread_load.*")
 warnings.filterwarnings("ignore", category=UserWarning, message=".*tight_layout.*")
 
-# 设置 matplotlib 字体
-plt.rcParams['font.sans-serif'] = ['SimHei']  # 支持中文显示
-plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+# 设置 matplotlib 字体（根据操作系统自动选择可用中文字体）
+if platform.system() == "Windows":
+    plt.rcParams['font.sans-serif'] = [
+        'Microsoft YaHei',  # 常见 Windows 中文字体
+        'SimHei',
+        'Arial Unicode MS'
+    ]
+elif platform.system() == "Darwin":  # macOS
+    plt.rcParams['font.sans-serif'] = [
+        'PingFang SC',
+        'Heiti SC',
+        'Hiragino Sans GB',
+        'STHeiti',
+        'Arial Unicode MS',
+        'SimHei'
+    ]
+else:  # Linux 通用
+    plt.rcParams['font.sans-serif'] = [
+        'WenQuanYi Zen Hei',
+        'Noto Sans CJK SC',
+        'DejaVu Sans',
+        'SimHei'
+    ]
+
+# 解决负号显示问题
+plt.rcParams['axes.unicode_minus'] = False
 
 # 设置页面
 st.set_page_config(
@@ -561,6 +587,6 @@ else:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center'>
-    <p>SilentCut © 2025 | 智能音频静音切割工具</p>
+    <p>SilentCut &copy; 2025 | 智能音频静音切割工具</p>
 </div>
 """, unsafe_allow_html=True)
