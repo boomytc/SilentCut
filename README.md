@@ -21,8 +21,8 @@
 ### 方法一：直接从源码运行
 ```bash
 # 克隆仓库
-git clone https://github.com/yourusername/silentcut.git
-cd silentcut
+git clone https://github.com/boomytc/SilentCut.git
+cd SilentCut
 
 # 安装依赖
 pip install -r requirements.txt
@@ -82,7 +82,7 @@ silentcut --help
 
 ## 项目结构
 ```
-silentcut/
+SilentCut/
 ├─ silentcut/            # 核心包
 │   ├─ audio/            # 音频处理模块
 │   │   ├─ processor.py  # 音频处理器
