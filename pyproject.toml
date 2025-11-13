@@ -19,6 +19,7 @@ dependencies = [
   "PyQt6>=6.2.0",
   "streamlit>=1.10.0",
   "soundfile>=0.10.3",
+  "ten-vad @ git+https://github.com/TEN-framework/ten-vad.git",
 ]
 
 [project.scripts]
@@ -31,4 +32,3 @@ include = ["silentcut*"]
 
 [tool.setuptools]
 include-package-data = true
-

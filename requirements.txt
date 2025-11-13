@@ -4,3 +4,4 @@ streamlit
 librosa 
 matplotlib 
 soundfile
+git+https://github.com/TEN-framework/ten-vad.git
