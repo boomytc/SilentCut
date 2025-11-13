@@ -24,7 +24,7 @@ dependencies = [
 
 [project.scripts]
 silentcut = "silentcut.cli.__main__:main"
-silentcut-gui = "silentcut.gui.main:main"
+silentcut-gui = "silentcut.gui.__main__:main"
 silentcut-web = "silentcut.web.__main__:main"
 
 [tool.setuptools.packages.find]
