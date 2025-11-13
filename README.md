@@ -22,6 +22,9 @@ cd SilentCut
 
 # 开发模式安装（推荐）
 pip install -e .
+silentcut --help
+silentcut-gui
+silentcut-web
 
 # 或仅安装依赖
 pip install -r requirements.txt
@@ -32,14 +35,6 @@ python silentcut_gui.py
 python silentcut_web.py
 # CLI
 python silentcut_cli.py
-```
-
-### 包方式
-```bash
-pip install silentcut
-silentcut --help
-silentcut-gui
-silentcut-web
 ```
 
 ## 使用说明
