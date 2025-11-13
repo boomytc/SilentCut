@@ -7,7 +7,7 @@ import tempfile
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from PyQt6.QtWidgets import (
-    QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, 
+    QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QLineEdit, QPushButton, 
     QFileDialog, QTextEdit, QSpinBox, QDoubleSpinBox, QProgressBar, QMessageBox,
     QRadioButton, QCheckBox, QGroupBox
 )
@@ -581,162 +581,116 @@ class DesilencerController:
         
         # 创建模式选择区域
         mode_group = QGroupBox("处理模式")
-        mode_layout = QHBoxLayout()
-        
-        # 单文件模式
+        mode_grid = QGridLayout()
         self.single_radio = QRadioButton("单文件处理")
         self.single_radio.setChecked(True)
         self.single_radio.toggled.connect(self.update_mode)
-        mode_layout.addWidget(self.single_radio)
-        
-        # 批处理模式
         self.batch_radio = QRadioButton("批量处理")
         self.batch_radio.toggled.connect(self.update_mode)
-        mode_layout.addWidget(self.batch_radio)
-        
-        # 设置模式组
-        mode_group.setLayout(mode_layout)
+        mode_grid.addWidget(self.single_radio, 0, 0)
+        mode_grid.addWidget(self.batch_radio, 0, 1)
+        mode_group.setLayout(mode_grid)
         layout.addWidget(mode_group)
         
         # 创建输入区域
         input_group = QGroupBox("输入")
-        input_layout = QVBoxLayout()
-        
-        # 输入路径
-        input_path_layout = QHBoxLayout()
+        input_grid = QGridLayout()
         self.input_path_label = QLabel("输入文件:")
         self.input_path_edit = QLineEdit()
         self.input_path_edit.setReadOnly(True)
         self.browse_input_btn = QPushButton("浏览...")
         self.browse_input_btn.clicked.connect(self.browse_input)
-        
-        input_path_layout.addWidget(self.input_path_label)
-        input_path_layout.addWidget(self.input_path_edit, 1)
-        input_path_layout.addWidget(self.browse_input_btn)
-        input_layout.addLayout(input_path_layout)
-        
-        # 输出路径
-        output_path_layout = QHBoxLayout()
+        input_grid.addWidget(self.input_path_label, 0, 0)
+        input_grid.addWidget(self.input_path_edit, 0, 1)
+        input_grid.addWidget(self.browse_input_btn, 0, 2)
         self.output_path_label = QLabel("输出目录:")
         self.output_path_edit = QLineEdit()
         self.output_path_edit.setReadOnly(True)
         self.browse_output_btn = QPushButton("浏览...")
         self.browse_output_btn.clicked.connect(self.browse_output_folder)
-        
-        output_path_layout.addWidget(self.output_path_label)
-        output_path_layout.addWidget(self.output_path_edit, 1)
-        output_path_layout.addWidget(self.browse_output_btn)
-        input_layout.addLayout(output_path_layout)
-        
-        # 设置输入组
-        input_group.setLayout(input_layout)
+        input_grid.addWidget(self.output_path_label, 1, 0)
+        input_grid.addWidget(self.output_path_edit, 1, 1)
+        input_grid.addWidget(self.browse_output_btn, 1, 2)
+        input_grid.setColumnStretch(1, 1)
+        input_group.setLayout(input_grid)
         layout.addWidget(input_group)
         
         # 创建参数区域
         params_group = QGroupBox("处理参数")
-        params_layout = QVBoxLayout()
-        
-        # 最小静音长度
-        silence_len_layout = QHBoxLayout()
+        params_grid = QGridLayout()
         self.silence_len_label = QLabel("最小静音长度 (毫秒):")
         self.silence_len_spinbox = QSpinBox()
         self.silence_len_spinbox.setRange(100, 5000)
         self.silence_len_spinbox.setValue(500)
         self.silence_len_spinbox.setSingleStep(100)
-        
-        silence_len_layout.addWidget(self.silence_len_label)
-        silence_len_layout.addWidget(self.silence_len_spinbox)
-        params_layout.addLayout(silence_len_layout)
-        
-        # 多进程设置
-        mp_layout = QHBoxLayout()
+        params_grid.addWidget(self.silence_len_label, 0, 0)
+        params_grid.addWidget(self.silence_len_spinbox, 0, 1)
         self.mp_checkbox = QCheckBox("启用多进程处理")
         self.mp_checkbox.setChecked(True)
         self.mp_checkbox.toggled.connect(self.toggle_mp_spinbox)
-        
         self.mp_cores_label = QLabel("进程数:")
         self.mp_cores_spinbox = QSpinBox()
         self.mp_cores_spinbox.setRange(1, self.max_cores)
         self.mp_cores_spinbox.setValue(min(4, self.max_cores))
-        
-        mp_layout.addWidget(self.mp_checkbox)
-        mp_layout.addWidget(self.mp_cores_label)
-        mp_layout.addWidget(self.mp_cores_spinbox)
-        params_layout.addLayout(mp_layout)
-        
-        # 并行搜索设置 (仅单文件模式)
-        self.parallel_search_layout = QHBoxLayout()
+        params_grid.addWidget(self.mp_checkbox, 1, 0)
+        params_grid.addWidget(self.mp_cores_label, 1, 1)
+        params_grid.addWidget(self.mp_cores_spinbox, 1, 2)
+        self.parallel_search_layout = QGridLayout()
         self.parallel_search_checkbox = QCheckBox("启用并行阈值搜索")
         self.parallel_search_checkbox.setChecked(True)
-        
         self.thresholds_label = QLabel("阈值预设点:")
         self.thresholds_edit = QLineEdit("-90,-80,-70,-60,-50,-40,-30,-20,-10")
-        
-        self.parallel_search_layout.addWidget(self.parallel_search_checkbox)
-        self.parallel_search_layout.addWidget(self.thresholds_label)
-        self.parallel_search_layout.addWidget(self.thresholds_edit, 1)
-        params_layout.addLayout(self.parallel_search_layout)
-
+        self.parallel_search_layout.addWidget(self.parallel_search_checkbox, 0, 0)
+        self.parallel_search_layout.addWidget(self.thresholds_label, 0, 1)
+        self.parallel_search_layout.addWidget(self.thresholds_edit, 0, 2)
+        self.parallel_search_layout.setColumnStretch(2, 1)
+        params_grid.addLayout(self.parallel_search_layout, 2, 0, 1, 3)
         self.vad_checkbox = QCheckBox("启用VAD语音检测")
-        params_layout.addWidget(self.vad_checkbox)
-
-        vad_params_layout = QHBoxLayout()
+        params_grid.addWidget(self.vad_checkbox, 3, 0)
         self.vad_threshold_label = QLabel("VAD 阈值:")
         self.vad_threshold_spinbox = QDoubleSpinBox()
         self.vad_threshold_spinbox.setRange(0.0, 1.0)
         self.vad_threshold_spinbox.setSingleStep(0.05)
         self.vad_threshold_spinbox.setValue(0.5)
+        params_grid.addWidget(self.vad_threshold_label, 4, 0)
+        params_grid.addWidget(self.vad_threshold_spinbox, 4, 1)
         self.vad_maxdur_label = QLabel("VAD 最大段时长(ms):")
         self.vad_maxdur_spinbox = QSpinBox()
         self.vad_maxdur_spinbox.setRange(1000, 30000)
         self.vad_maxdur_spinbox.setValue(5000)
+        params_grid.addWidget(self.vad_maxdur_label, 5, 0)
+        params_grid.addWidget(self.vad_maxdur_spinbox, 5, 1)
         self.vad_minsil_label = QLabel("VAD 最小静音(ms):")
         self.vad_minsil_spinbox = QSpinBox()
         self.vad_minsil_spinbox.setRange(0, 5000)
         self.vad_minsil_spinbox.setValue(1000)
-        vad_params_layout.addWidget(self.vad_threshold_label)
-        vad_params_layout.addWidget(self.vad_threshold_spinbox)
-        vad_params_layout.addWidget(self.vad_maxdur_label)
-        vad_params_layout.addWidget(self.vad_maxdur_spinbox)
-        vad_params_layout.addWidget(self.vad_minsil_label)
-        vad_params_layout.addWidget(self.vad_minsil_spinbox)
-        params_layout.addLayout(vad_params_layout)
-        
-        # 设置参数组
-        params_group.setLayout(params_layout)
+        params_grid.addWidget(self.vad_minsil_label, 6, 0)
+        params_grid.addWidget(self.vad_minsil_spinbox, 6, 1)
+        params_grid.setColumnStretch(2, 1)
+        params_group.setLayout(params_grid)
         layout.addWidget(params_group)
         
         # 创建日志区域
         log_group = QGroupBox("处理日志")
-        log_layout = QVBoxLayout()
-        
+        log_grid = QGridLayout()
         self.log_edit = QTextEdit()
         self.log_edit.setReadOnly(True)
-        log_layout.addWidget(self.log_edit)
-        
-        # 进度条
+        log_grid.addWidget(self.log_edit, 0, 0, 1, 4)
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        log_layout.addWidget(self.progress_bar)
-        
-        # 处理详情
-        details_layout = QHBoxLayout()
-        
+        log_grid.addWidget(self.progress_bar, 1, 0, 1, 4)
         self.file_size_label = QLabel("文件大小: -")
         self.process_time_label = QLabel("处理时间: -")
         self.threshold_label = QLabel("使用阈值: -")
         self.ratio_label = QLabel("大小比例: -")
-        
-        details_layout.addWidget(self.file_size_label)
-        details_layout.addWidget(self.process_time_label)
-        details_layout.addWidget(self.threshold_label)
-        details_layout.addWidget(self.ratio_label)
-        
-        log_layout.addLayout(details_layout)
-        
-        # 设置日志组
-        log_group.setLayout(log_layout)
+        log_grid.addWidget(self.file_size_label, 2, 0)
+        log_grid.addWidget(self.process_time_label, 2, 1)
+        log_grid.addWidget(self.threshold_label, 2, 2)
+        log_grid.addWidget(self.ratio_label, 2, 3)
+        for i in range(4):
+            log_grid.setColumnStretch(i, 1)
+        log_group.setLayout(log_grid)
         layout.addWidget(log_group)
         
         # 创建操作按钮

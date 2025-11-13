@@ -24,7 +24,7 @@ class MainWindow(QMainWindow):
         
         # 设置窗口基本属性
         self.setWindowTitle("SilentCut - 音频静音切割工具")
-        self.setMinimumSize(800, 600)
+        self.setMinimumSize(800, 750)
         
         # 尝试设置图标（如果存在）
         icon_path = self._get_icon_path()
