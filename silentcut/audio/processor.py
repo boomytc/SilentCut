@@ -6,7 +6,7 @@ import logging
 from pydub import AudioSegment
 from pydub.silence import split_on_silence
 from silentcut.utils.logger import get_logger
-from silentcut.utils.file_utils import ensure_dir_exists, get_output_filename
+from silentcut.utils.file_utils import ensure_dir_exists, get_output_filename, get_format_codec_from_path
 from silentcut.utils.vad_detect import vad_detect
 
 logger = get_logger("audio")
@@ -78,6 +78,7 @@ class AudioProcessor:
             output_path = get_output_filename(self.input_file, suffix="-desilenced", output_dir=output_folder)
             out_dir = os.path.dirname(output_path)
             ensure_dir_exists(out_dir)
+            out_format, out_codec, out_ext = get_format_codec_from_path(self.input_file)
             
             # --- 计算目标文件大小范围 ---
             min_acceptable_size = int(input_size * MIN_SIZE_RATIO)  # 最小可接受大小（原始大小的50%）
@@ -103,7 +104,7 @@ class AudioProcessor:
                 if not segments:
                     return False, f"无法找到语音片段处理文件 {basename}"
                 output_audio = sum(segments)
-                output_audio.export(output_path, format="wav")
+                output_audio.export(output_path, format=out_format, codec=out_codec)
                 final_size = os.path.getsize(output_path)
                 actual_ratio = final_size / input_size
                 actual_reduction = ((input_size - final_size) / input_size * 100)
@@ -181,11 +182,11 @@ class AudioProcessor:
                     
                     # 创建临时文件以检查大小
                     import tempfile
-                    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
+                    with tempfile.NamedTemporaryFile(suffix=f".{out_ext}", delete=False) as temp_file:
                         temp_path = temp_file.name
                     
                     # 导出并检查大小
-                    output_audio.export(temp_path, format="wav")
+                    output_audio.export(temp_path, format=out_format, codec=out_codec)
                     output_size = os.path.getsize(temp_path)
                     size_ratio = output_size / input_size
                     
@@ -323,7 +324,7 @@ class AudioProcessor:
             if best_threshold is not None and best_audio is not None:
                 # 导出最终结果
                 logger.info(f"使用最佳阈值 {best_threshold:.1f} dBFS 导出最终结果: {output_path}")
-                best_audio.export(output_path, format="wav")
+                best_audio.export(output_path, format=out_format, codec=out_codec)
                 
                 # 检查最终文件大小
                 final_size = os.path.getsize(output_path)

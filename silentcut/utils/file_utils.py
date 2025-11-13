@@ -43,6 +43,14 @@ def get_output_filename(input_file, suffix="-desilenced", output_dir=None):
         
     return output_path
 
+def get_format_codec_from_path(file_path):
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext == ".m4a":
+        return "mp4", "aac", "m4a"
+    if ext in (".mp3", ".wav", ".flac", ".ogg"):
+        return ext.lstrip("."), None, ext.lstrip(".")
+    return "wav", None, "wav"
+
 
 def create_temp_directory(prefix="silentcut_"):
     """

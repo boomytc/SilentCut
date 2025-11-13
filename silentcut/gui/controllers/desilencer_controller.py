@@ -15,7 +15,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from silentcut.audio.processor import AudioProcessor, PRESET_THRESHOLDS, split_audio_by_silence
 from silentcut.utils.logger import get_logger
-from silentcut.utils.file_utils import get_audio_files_in_directory, get_output_filename
+from silentcut.utils.file_utils import get_audio_files_in_directory, get_output_filename, get_format_codec_from_path
 
 # 获取日志记录器
 logger = get_logger("gui.desilencer_controller")
@@ -66,10 +66,11 @@ def test_threshold_task(args):
         # 创建临时文件以检查大小
         basename = os.path.basename(input_file)
         name, ext = os.path.splitext(basename)
-        temp_output_path = os.path.join(output_dir, f"{name}_thresh_{threshold}_{time.time()}.temp.wav")
+        out_format, out_codec, out_ext = get_format_codec_from_path(input_file)
+        temp_output_path = os.path.join(output_dir, f"{name}_thresh_{threshold}_{time.time()}.temp.{out_ext}")
         
         # 导出并检查大小
-        output_audio.export(temp_output_path, format="wav")
+        output_audio.export(temp_output_path, format=out_format, codec=out_codec)
         output_size = os.path.getsize(temp_output_path)
         size_ratio = output_size / input_size
         
@@ -356,7 +357,8 @@ class Worker(QThread):
                 
                 # 合并并导出
                 output_audio = sum(chunks)
-                output_audio.export(output_path, format="wav")
+                out_format, out_codec, _ = get_format_codec_from_path(input_file)
+                output_audio.export(output_path, format=out_format, codec=out_codec)
                 
                 # 构造结果消息，包含关键信息
                 result_message = (

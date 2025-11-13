@@ -20,7 +20,7 @@ import platform  # 新增，用于根据系统设置中文字体
 from silentcut.audio.processor import AudioProcessor, split_audio_by_silence
 from silentcut.utils.vad_detect import vad_detect
 from silentcut.utils.logger import get_logger
-from silentcut.utils.file_utils import ensure_dir_exists, clean_temp_files, get_output_filename
+from silentcut.utils.file_utils import ensure_dir_exists, clean_temp_files, get_output_filename, get_format_codec_from_path
 
 # 获取日志记录器
 logger = get_logger("web")
@@ -194,10 +194,11 @@ def test_threshold_task(input_file_path, min_silence_len, threshold, output_dir)
         # 创建临时文件以检查大小
         basename = os.path.basename(input_file_path)
         name, ext = os.path.splitext(basename)
-        temp_output_path = os.path.join(output_dir, f"{name}_thresh_{threshold}_{time.time()}.temp.wav")
+        out_format, out_codec, out_ext = get_format_codec_from_path(input_file_path)
+        temp_output_path = os.path.join(output_dir, f"{name}_thresh_{threshold}_{time.time()}.temp.{out_ext}")
         
         # 导出并检查大小
-        output_audio.export(temp_output_path, format="wav")
+        output_audio.export(temp_output_path, format=out_format, codec=out_codec)
         output_size = os.path.getsize(temp_output_path)
         size_ratio = output_size / input_size
         
@@ -335,7 +336,8 @@ def process_audio_mp(input_file_path, output_dir, min_silence_len, preset_thresh
                 
                 # 合并并导出
                 output_audio = sum(chunks)
-                output_audio.export(output_path, format="wav")
+                out_format, out_codec, _ = get_format_codec_from_path(input_file_path)
+                output_audio.export(output_path, format=out_format, codec=out_codec)
                 
                 # 清理临时文件
                 clean_temp_files(temp_files)
