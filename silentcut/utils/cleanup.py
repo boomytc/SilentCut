@@ -1,60 +1,74 @@
-"""
-临时文件清理工具
-用于清理SilentCut生成的临时文件
-"""
 import os
-import glob
 import sys
+import tempfile
+import shutil
 from .logger import get_logger
 
-# 获取日志记录器
 logger = get_logger("cleanup")
 
+def _is_temp_filename(name):
+    temp_suffixes = (".tmp", ".temp", ".partial", ".cache", ".swp")
+    if name.endswith(temp_suffixes):
+        return True
+    audio_exts = (".wav", ".mp3", ".flac", ".ogg", ".m4a")
+    for ext in audio_exts:
+        if name.endswith(ext + ".tmp") or name.endswith(ext + ".temp"):
+            return True
+        if name.endswith(".tmp" + ext) or name.endswith(".temp" + ext):
+            return True
+    return False
+
+def _remove_file(path):
+    try:
+        os.remove(path)
+        return 1
+    except Exception as e:
+        logger.error(f"删除 {path} 时出错: {e}")
+        return 0
+
+def _remove_silentcut_temp_dirs():
+    root = tempfile.gettempdir()
+    removed = 0
+    try:
+        for name in os.listdir(root):
+            if name.startswith("silentcut_"):
+                dir_path = os.path.join(root, name)
+                if os.path.isdir(dir_path):
+                    # 统计目录内文件数
+                    file_count = 0
+                    for _r, _d, _f in os.walk(dir_path):
+                        file_count += len(_f)
+                    shutil.rmtree(dir_path, ignore_errors=True)
+                    removed += file_count
+                    logger.info(f"已删除临时目录: {dir_path}")
+    except Exception as e:
+        logger.error(f"删除系统临时目录时出错: {e}")
+    return removed
+
 def cleanup_temp_files(directory=None):
-    """
-    清理指定目录中所有的临时音频文件
-    
-    Args:
-        directory: 要清理的目录路径，默认为None(当前目录)
-    
-    Returns:
-        清理的文件数量
-    """
     if directory is None:
         directory = os.getcwd()
-    
     if not os.path.isdir(directory):
         logger.error(f"错误: {directory} 不是一个有效的目录")
         return 0
-        
-    count = 0
-    # 查找所有包含'_thresh_'和'.temp.wav'的临时文件
-    patterns = [
-        '*_thresh_*.temp.wav',  # 新的UUID格式临时文件
-        '*_thresh_*.temp.*',    # 其他可能的临时文件格式
-    ]
-    
-    for pattern in patterns:
-        for temp_file in glob.glob(os.path.join(directory, pattern)):
-            try:
-                os.remove(temp_file)
-                count += 1
-                logger.info(f"已删除: {os.path.basename(temp_file)}")
-            except Exception as e:
-                logger.error(f"删除 {temp_file} 时出错: {e}")
-    
-    return count
+
+    removed = 0
+    for root, _, files in os.walk(directory):
+        for fname in files:
+            if _is_temp_filename(fname):
+                fpath = os.path.join(root, fname)
+                removed += _remove_file(fpath)
+                logger.info(f"已删除: {os.path.relpath(fpath, directory)}")
+
+    removed += _remove_silentcut_temp_dirs()
+    return removed
 
 def main():
-    """命令行入口点"""
-    # 可以从命令行运行
     directory = sys.argv[1] if len(sys.argv) > 1 else None
-    
     if directory:
         print(f"正在清理目录: {directory}")
     else:
         print(f"正在清理当前目录: {os.getcwd()}")
-        
     count = cleanup_temp_files(directory)
     print(f"共清理了 {count} 个临时文件")
 
