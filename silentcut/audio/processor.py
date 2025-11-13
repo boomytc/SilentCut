@@ -1,34 +1,13 @@
 """
-音频处理器模块 - 静音检测与切割核心算法
+音频处理器模块 - 基于 VAD 的语音检测与切割
 """
 import os
-import logging
 from pydub import AudioSegment
-from pydub.silence import split_on_silence
 from silentcut.utils.logger import get_logger
 from silentcut.utils.file_utils import ensure_dir_exists, get_output_filename, get_format_codec_from_path
 from silentcut.utils.vad_detect import vad_detect
 
 logger = get_logger("audio")
-
-# 阈值范围的最小和最大值 - 扩大范围
-MIN_THRESHOLD = -100  # 最严格的阈值
-MAX_THRESHOLD = 0     # 最宽松的阈值
-INITIAL_STEP = 10     # 初始搜索时的步长
-FINE_STEP = 2         # 精细搜索时的步长
-
-# 默认初始阈值偏移量（用于计算自适应初始阈值）
-ADAPTIVE_THRESHOLD_OFFSET = 30  # 增加偏移量，使初始阈值更严格
-
-# 文件大小比例限制 - 确保处理后文件大小严格小于原始大小但大于原始大小的50%
-MIN_SIZE_RATIO = 0.5
-MAX_SIZE_RATIO = 0.99  # 确保严格小于原始大小
-
-# 最大搜索次数限制，防止无限循环
-MAX_SEARCH_ATTEMPTS = 40  # 增加最大尝试次数
-
-# 预设阈值点 - 用于快速搜索常用阈值
-PRESET_THRESHOLDS = [-90, -80, -70, -60, -50, -45, -40, -35, -30, -25, -20, -15, -10]
 
 
 class AudioProcessor:
@@ -41,7 +20,6 @@ class AudioProcessor:
         """加载音频文件"""
         try:
             logger.info(f"开始加载文件: {self.input_file}")
-            # 使用 from_file 尝试自动检测格式，而不是强制 from_wav
             self.audio = AudioSegment.from_file(self.input_file)
             logger.info(f"文件加载成功: {self.input_file}")
         except FileNotFoundError:
@@ -53,15 +31,16 @@ class AudioProcessor:
             self.audio = None
             raise
 
-    def process_audio(self, min_silence_len=1000, output_folder=None, use_vad=False,
-                      vad_threshold=None, vad_min_silence_ms=None, vad_max_duration_ms=None):
+    def process_audio(self, output_folder=None, vad_threshold=0.5, 
+                     vad_min_silence_ms=1000, vad_max_duration_ms=5000):
         """
-        处理音频文件，移除静音部分。
-        使用自适应搜索策略，确保处理后文件大小严格小于原始文件但大于原始文件的50%。
+        使用 VAD 语音检测处理音频文件，移除静音部分。
         
         Args:
-            min_silence_len: 最小静音长度（毫秒）
             output_folder: 输出目录，如果为None则使用输入文件所在目录
+            vad_threshold: VAD 检测阈值 (0.0-1.0)
+            vad_min_silence_ms: 最小静音长度（毫秒）
+            vad_max_duration_ms: 最大段时长（毫秒）
             
         Returns:
             (success, message): 处理是否成功及相关信息
@@ -74,303 +53,57 @@ class AudioProcessor:
             input_size = os.path.getsize(self.input_file)
             basename = os.path.basename(self.input_file)
             
-            # --- 确定输出路径 ---
+            # 确定输出路径
             output_path = get_output_filename(self.input_file, suffix="-desilenced", output_dir=output_folder)
             out_dir = os.path.dirname(output_path)
             ensure_dir_exists(out_dir)
             out_format, out_codec, out_ext = get_format_codec_from_path(self.input_file)
             
-            # --- 计算目标文件大小范围 ---
-            min_acceptable_size = int(input_size * MIN_SIZE_RATIO)  # 最小可接受大小（原始大小的50%）
-            max_acceptable_size = int(input_size * MAX_SIZE_RATIO)  # 最大可接受大小（原始大小的99%）
-            logger.info(f"目标文件大小范围: {min_acceptable_size} - {max_acceptable_size} bytes (原始: {input_size} bytes)")
-            if use_vad:
-                vad_kwargs = {}
-                if vad_threshold is not None:
-                    vad_kwargs["threshold"] = vad_threshold
-                if vad_min_silence_ms is not None:
-                    vad_kwargs["min_silence_ms"] = vad_min_silence_ms
-                else:
-                    vad_kwargs["min_silence_ms"] = min_silence_len
-                if vad_max_duration_ms is not None:
-                    vad_kwargs["max_duration_ms"] = vad_max_duration_ms
-
-                segments_info = vad_detect(self.input_file, **vad_kwargs)
-                segments = []
-                for item in segments_info:
-                    for start_ms, end_ms in item.get("value", []):
-                        segment = self.audio[start_ms:end_ms]
-                        segments.append(segment)
-                if not segments:
-                    return False, f"无法找到语音片段处理文件 {basename}"
-                output_audio = sum(segments)
-                output_audio.export(output_path, format=out_format, codec=out_codec)
-                final_size = os.path.getsize(output_path)
-                actual_ratio = final_size / input_size
-                actual_reduction = ((input_size - final_size) / input_size * 100)
-                if min_acceptable_size < final_size < input_size:
-                    final_message = f"{output_path} (模式: VAD, 大小: {input_size} -> {final_size} bytes, 减少: {actual_reduction:.2f}%, 保留: {actual_ratio*100:.2f}%)"
-                    return True, final_message
-                if final_size >= input_size:
-                    if actual_ratio < 1.01:
-                        final_message = f"{output_path} (模式: VAD, 大小: {input_size} -> {final_size} bytes, 减少: {actual_reduction:.2f}%, 保留: {actual_ratio*100:.2f}%)"
-                        return True, final_message
-                    return False, f"无法使文件 {basename} 变小，最终结果为原始大小的 {actual_ratio:.2f} 倍"
-                if final_size <= min_acceptable_size:
-                    if actual_ratio > MIN_SIZE_RATIO * 0.9:
-                        final_message = f"{output_path} (模式: VAD, 大小: {input_size} -> {final_size} bytes, 减少: {actual_reduction:.2f}%, 保留: {actual_ratio*100:.2f}%)"
-                        return True, final_message
-                    return False, f"无法保留足够的音频内容，最终结果仅保留了 {actual_ratio*100:.2f}% 的原始内容，小于最小要求 {MIN_SIZE_RATIO*100}%"
+            logger.info(f"使用 VAD 模式处理音频: threshold={vad_threshold}, min_silence={vad_min_silence_ms}ms, max_duration={vad_max_duration_ms}ms")
             
-            # --- 计算初始自适应阈值 ---
-            average_dbfs = self.audio.dBFS
+            # 使用 VAD 检测语音段
+            vad_kwargs = {
+                "threshold": vad_threshold,
+                "min_silence_ms": vad_min_silence_ms,
+                "max_duration_ms": vad_max_duration_ms
+            }
             
-            # 分析音频特征
-            # 计算实际最大音量和最小音量，而不仅仅依赖平均值
-            segments = self.audio[::1000]  # 每秒采样一次
-            segment_dbfs_values = [segment.dBFS for segment in segments if segment.dBFS > float('-inf')]
+            segments_info = vad_detect(self.input_file, **vad_kwargs)
             
-            if segment_dbfs_values:
-                max_dbfs = max(segment_dbfs_values)
-                min_dbfs = min(segment_dbfs_values)
-                
-                # 计算音量动态范围
-                dynamic_range = max_dbfs - min_dbfs
-                
-                # 根据动态范围调整初始阈值
-                # 如果动态范围大，使用更严格的阈值；如果动态范围小，使用更宽松的阈值
-                initial_threshold = min_dbfs + min(dynamic_range * 0.3, ADAPTIVE_THRESHOLD_OFFSET)
-                
-                # 确保初始阈值在合理范围内
-                initial_threshold = max(MIN_THRESHOLD, min(initial_threshold, MAX_THRESHOLD - 20))
-            else:
-                # 如果无法计算特征，使用基于平均值的保守估计
-                initial_threshold = average_dbfs - ADAPTIVE_THRESHOLD_OFFSET
-                
-            logger.info(f"音频特征: 平均dBFS={average_dbfs:.1f}, 初始阈值={initial_threshold:.1f}")
+            # 提取语音段
+            segments = []
+            for item in segments_info:
+                for start_ms, end_ms in item.get("value", []):
+                    segment = self.audio[start_ms:end_ms]
+                    segments.append(segment)
             
-            # --- 二分搜索最佳阈值 ---
-            # 首先尝试预设阈值点，看是否有符合要求的
-            preset_results = []
+            if not segments:
+                logger.warning(f"未检测到语音片段: {basename}")
+                return False, f"无法找到语音片段处理文件 {basename}"
             
-            def test_threshold(threshold, is_preset=False):
-                """测试特定阈值的效果"""
-                logging.info(f"测试阈值: {threshold:.1f} dBFS")
-                
-                try:
-                    # 使用当前阈值分割音频
-                    chunks = split_on_silence(
-                        self.audio,
-                        min_silence_len=min_silence_len,
-                        silence_thresh=threshold,
-                        keep_silence=100  # 保留一小段静音，避免声音突然切换
-                    )
-                    
-                    # 如果没有检测到任何非静音片段，返回失败
-                    if not chunks:
-                        logging.warning(f"阈值 {threshold:.1f} dBFS: 未检测到非静音片段")
-                        return {
-                            "threshold": threshold,
-                            "status": "no_chunks",
-                            "size": 0,
-                            "ratio": 0,
-                            "chunks": 0
-                        }
-                    
-                    # 合并非静音片段
-                    output_audio = sum(chunks)
-                    
-                    # 创建临时文件以检查大小
-                    import tempfile
-                    with tempfile.NamedTemporaryFile(suffix=f".{out_ext}", delete=False) as temp_file:
-                        temp_path = temp_file.name
-                    
-                    # 导出并检查大小
-                    output_audio.export(temp_path, format=out_format, codec=out_codec)
-                    output_size = os.path.getsize(temp_path)
-                    size_ratio = output_size / input_size
-                    
-                    # 删除临时文件
-                    try:
-                        os.unlink(temp_path)
-                    except:
-                        pass
-                    
-                    logging.info(f"阈值 {threshold:.1f} dBFS: 比例={size_ratio:.2f}, 大小={output_size} bytes ({len(chunks)} 个片段)")
-                    
-                    return {
-                        "threshold": threshold,
-                        "status": "success",
-                        "size": output_size,
-                        "ratio": size_ratio,
-                        "chunks": len(chunks),
-                        "audio": output_audio
-                    }
-                except Exception as e:
-                    logging.error(f"测试阈值 {threshold:.1f} dBFS 时出错: {e}")
-                    return {
-                        "threshold": threshold,
-                        "status": "error",
-                        "error": str(e)
-                    }
+            # 合并所有语音段
+            output_audio = sum(segments)
             
-            # 尝试预设阈值点
-            logger.info("尝试预设阈值点...")
-            for preset in PRESET_THRESHOLDS:
-                result = test_threshold(preset, is_preset=True)
-                if result["status"] == "success":
-                    preset_results.append(result)
+            # 导出处理后的音频
+            output_audio.export(output_path, format=out_format, codec=out_codec)
             
-            # 如果有预设阈值符合要求，直接使用
-            valid_presets = [r for r in preset_results if min_acceptable_size <= r["size"] <= max_acceptable_size]
-            if valid_presets:
-                # 选择最接近目标比例0.7的预设阈值
-                valid_presets.sort(key=lambda r: abs(r["ratio"] - 0.7))
-                best_result = valid_presets[0]
-                best_threshold = best_result["threshold"]
-                best_audio = best_result["audio"]
-                
-                logging.info(f"找到符合要求的预设阈值: {best_threshold:.1f} dBFS, 比例={best_result['ratio']:.2f}")
-            else:
-                # 如果预设阈值都不符合要求，使用二分搜索
-                logger.info("预设阈值不符合要求，开始二分搜索...")
-                
-                # 初始化搜索范围
-                low = MIN_THRESHOLD
-                high = MAX_THRESHOLD
-                
-                # 如果有预设结果，可以缩小搜索范围
-                if preset_results:
-                    # 找出最接近但大于目标大小的预设阈值
-                    larger_presets = [r for r in preset_results if r["size"] > max_acceptable_size]
-                    if larger_presets:
-                        larger_presets.sort(key=lambda r: r["size"])
-                        high = larger_presets[0]["threshold"]
-                    
-                    # 找出最接近但小于目标大小的预设阈值
-                    smaller_presets = [r for r in preset_results if r["size"] < min_acceptable_size]
-                    if smaller_presets:
-                        smaller_presets.sort(key=lambda r: -r["size"])
-                        low = smaller_presets[0]["threshold"]
-                
-                # 使用自适应初始阈值作为起点
-                current = initial_threshold
-                
-                # 记录已测试的阈值和结果
-                tested_thresholds = {}
-                best_result = None
-                best_threshold = None
-                best_audio = None
-                
-                # 二分搜索
-                attempts = 0
-                while attempts < MAX_SEARCH_ATTEMPTS:
-                    attempts += 1
-                    
-                    # 如果当前阈值已测试过，跳过
-                    current_rounded = round(current, 1)  # 四舍五入到小数点后1位
-                    if current_rounded in tested_thresholds:
-                        # 微调当前值，避免重复测试
-                        current += 0.2
-                        continue
-                    
-                    # 测试当前阈值
-                    result = test_threshold(current_rounded)
-                    tested_thresholds[current_rounded] = result
-                    
-                    if result["status"] == "success":
-                        output_size = result["size"]
-                        
-                        # 检查是否符合大小要求
-                        if min_acceptable_size <= output_size <= max_acceptable_size:
-                            # 找到符合要求的阈值，记录结果
-                            if best_result is None or abs(result["ratio"] - 0.7) < abs(best_result["ratio"] - 0.7):
-                                best_result = result
-                                best_threshold = current_rounded
-                                best_audio = result["audio"]
-                                logger.info(
-                                    f"找到符合要求的阈值: {best_threshold:.1f} dBFS, 比例={best_result['ratio']:.2f}"
-                                )
-                                # 如果比例非常接近0.7，可以提前结束搜索
-                                if abs(result["ratio"] - 0.7) < 0.05:
-                                    logger.info("比例非常接近目标值，提前结束搜索")
-                                    break
-                        
-                        # 根据结果调整搜索范围
-                        if output_size > max_acceptable_size:
-                            # 文件太大，需要更严格的阈值（更小的dBFS值）
-                            high = current
-                            current = (low + current) / 2
-                            logger.info(f"文件太大 ({output_size} > {max_acceptable_size})，调整搜索范围: [{low:.1f}, {current:.1f}]")
-                        elif output_size < min_acceptable_size:
-                            # 文件太小，需要更宽松的阈值（更大的dBFS值）
-                            low = current
-                            current = (current + high) / 2
-                            logger.info(f"文件太小 ({output_size} < {min_acceptable_size})，调整搜索范围: [{current:.1f}, {high:.1f}]")
-                    else:
-                        # 处理失败，可能是阈值太严格，尝试更宽松的阈值
-                        low = current
-                        current = (current + high) / 2
-                        logger.info(f"处理失败，尝试更宽松的阈值: {current:.1f}")
-                    
-                    # 检查搜索范围是否已经很小
-                    if high - low < 1:
-                        logger.info(f"搜索范围已经很小 ({low:.1f} - {high:.1f})，停止搜索")
-                        break
-                
-                logger.info(f"搜索完成，共尝试 {attempts} 次，测试了 {len(tested_thresholds)} 个不同阈值")
+            # 计算文件大小和统计信息
+            final_size = os.path.getsize(output_path)
+            actual_ratio = final_size / input_size
+            actual_reduction = ((input_size - final_size) / input_size * 100)
+            actual_retention = actual_ratio * 100
             
-            # 检查是否找到符合要求的阈值
-            if best_threshold is not None and best_audio is not None:
-                # 导出最终结果
-                logger.info(f"使用最佳阈值 {best_threshold:.1f} dBFS 导出最终结果: {output_path}")
-                best_audio.export(output_path, format=out_format, codec=out_codec)
-                
-                # 检查最终文件大小
-                final_size = os.path.getsize(output_path)
-                actual_ratio = final_size / input_size
-                actual_reduction = ((input_size - final_size) / input_size * 100)
-                actual_retention = actual_ratio * 100
-                
-                logger.info(f"最终文件大小: {input_size} -> {final_size} bytes (减少: {actual_reduction:.2f}%, 保留: {actual_retention:.2f}%)")
-                
-                # 严格检查文件大小是否符合要求
-                if min_acceptable_size < final_size < input_size:
-                    # 完全符合要求：小于原始大小但大于原始大小的50%
-                    status_msg = "理想范围内"
-                    logger.info(f"最终结果完全符合要求: 大小比例 {actual_ratio:.2f} (介于 {MIN_SIZE_RATIO} 和 1.0 之间)")
-                    
-                    final_message = f"{output_path} (阈值: {best_threshold:.1f} dBFS, 大小: {input_size} -> {final_size} bytes, 减少: {actual_reduction:.2f}%, 保留: {actual_retention:.2f}%, {status_msg})"
-                    logger.info(f"处理成功完成: {final_message}")
-                    return True, final_message
-                    
-                elif final_size >= input_size:
-                    # 处理后文件大小大于或等于原始文件，不符合要求
-                    logger.warning(f"最终结果大于或等于原始文件大小 ({final_size} >= {input_size} bytes)")
-                    
-                    # 如果非常接近原始大小（差距小于1%），仍然返回成功
-                    if actual_ratio < 1.01:  # 允许1%的误差
-                        logger.info(f"文件大小非常接近原始大小，仍然返回成功")
-                        final_message = f"{output_path} (阈值: {best_threshold:.1f} dBFS, 大小: {input_size} -> {final_size} bytes, 减少: {actual_reduction:.2f}%, 保留: {actual_retention:.2f}%)"
-                        return True, final_message
-                    
-                    return False, f"无法使文件 {basename} 变小，最终结果为原始大小的 {actual_ratio:.2f} 倍"
-                    
-                elif final_size <= min_acceptable_size:
-                    # 处理后文件大小小于原始文件的50%，不符合要求
-                    logger.warning(f"最终结果小于最小大小要求 ({final_size} <= {min_acceptable_size} bytes)")
-                    
-                    # 如果非常接近最小可接受大小（差距小于5%），仍然返回成功
-                    if actual_ratio > MIN_SIZE_RATIO * 0.9:  # 如果大小超过最小限制的90%
-                        logger.info(f"文件大小接近最小限制，仍然返回成功")
-                        final_message = f"{output_path} (阈值: {best_threshold:.1f} dBFS, 大小: {input_size} -> {final_size} bytes, 减少: {actual_reduction:.2f}%, 保留: {actual_retention:.2f}%)"
-                        return True, final_message
-                    
-                    return False, f"无法保留足够的音频内容，最终结果仅保留了 {actual_retention:.2f}% 的原始内容，小于最小要求 {MIN_SIZE_RATIO*100}%"
-            else:
-                # 没有找到有效的阈值
-                logger.warning(f"无法找到任何有效的阈值，放弃处理: {basename}")
-                return False, f"无法找到合适的阈值处理文件 {basename}"
+            logger.info(f"处理完成: {input_size} -> {final_size} bytes (减少: {actual_reduction:.2f}%, 保留: {actual_retention:.2f}%)")
+            
+            final_message = (
+                f"{output_path} "
+                f"(模式: VAD, "
+                f"大小: {input_size} -> {final_size} bytes, "
+                f"减少: {actual_reduction:.2f}%, "
+                f"保留: {actual_retention:.2f}%)"
+            )
+            
+            return True, final_message
 
         except Exception as e:
             logger.error(f"处理文件 {self.input_file} 时发生意外错误: {e}", exc_info=True)
@@ -383,19 +116,9 @@ if __name__ == '__main__':
     if os.path.exists(test_file):
         try:
             processor = AudioProcessor(test_file)
-            success, message = processor.process_audio(min_silence_len=1000)
+            success, message = processor.process_audio()
             print(f"处理结果: Success={success}, Message='{message}'")
         except Exception as e:
             print(f"测试时出错: {e}")
     else:
         print(f"测试文件未找到: {test_file}")
-
-
-def split_audio_by_silence(audio, min_silence_len, threshold):
-    chunks = split_on_silence(
-        audio,
-        min_silence_len=min_silence_len,
-        silence_thresh=threshold,
-        keep_silence=100,
-    )
-    return chunks

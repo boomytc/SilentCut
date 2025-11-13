@@ -133,9 +133,9 @@ class MainWindow(QMainWindow):
         QMessageBox.about(
             self,
             "关于 SilentCut",
-            f"<h3>SilentCut - 音频静音切割工具</h3>"
+            f"<h3>SilentCut - 基于 VAD 的音频静音切割工具</h3>"
             f"<p>版本: 0.1.0</p>"
-            f"<p>一个高效的音频处理工具，专注于自动检测并去除音频中的静音段。</p>"
+            f"<p>基于 VAD（Voice Activity Detection）语音检测技术，智能识别并保留音频中的语音段。</p>"
             f"<p>适用于播客剪辑、语音预处理、数据清洗等场景。</p>"
             f"<p>运行环境: Python {platform.python_version()} - {platform.system()} {platform.release()}</p>"
         )
