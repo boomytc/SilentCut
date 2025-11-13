@@ -2,8 +2,6 @@ from pathlib import Path
 from ten_vad import TenVad
 import numpy as np
 import librosa
-from contextlib import redirect_stderr, redirect_stdout
-from io import StringIO
 
 TARGET_SR = 16000
 HOP_SIZE = 256
