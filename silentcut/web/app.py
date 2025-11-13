@@ -2,8 +2,6 @@
 SilentCut Web 界面 - 基于 Streamlit 的 Web 应用
 """
 import os
-import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 import streamlit as st
 import tempfile
 import librosa
@@ -21,9 +19,9 @@ from pydub import AudioSegment
 import platform  # 新增，用于根据系统设置中文字体
 
 # 导入 SilentCut 核心模块
-from silentcut.audio.processor import AudioProcessor
+from silentcut.audio.processor import AudioProcessor, split_audio_by_silence
 from silentcut.utils.logger import get_logger
-from silentcut.utils.file_utils import ensure_dir_exists, clean_temp_files
+from silentcut.utils.file_utils import ensure_dir_exists, clean_temp_files, get_output_filename
 
 # 获取日志记录器
 logger = get_logger("web")
@@ -165,7 +163,6 @@ def test_threshold_task(input_file_path, min_silence_len, threshold, output_dir)
     """测试特定阈值的效果，用于多进程并行测试多个阈值"""
     try:
         from pydub import AudioSegment
-        from pydub.silence import split_on_silence
         import os
         
         # 读取音频文件
@@ -173,12 +170,7 @@ def test_threshold_task(input_file_path, min_silence_len, threshold, output_dir)
         input_size = os.path.getsize(input_file_path)
         
         # 使用指定阈值分割音频
-        chunks = split_on_silence(
-            audio,
-            min_silence_len=min_silence_len,
-            silence_thresh=threshold,
-            keep_silence=100  # 保留一小段静音，避免声音突然切换
-        )
+        chunks = split_audio_by_silence(audio, min_silence_len, threshold)
         
         if not chunks:
             return {
@@ -236,10 +228,7 @@ def process_audio_mp(input_file_path, output_dir, min_silence_len, preset_thresh
         basename = os.path.basename(input_file_path)
         
         # 生成输出文件名
-        input_dir, input_filename = os.path.split(input_file_path)
-        name, ext = os.path.splitext(input_filename)
-        output_filename = f"{name}-desilenced.wav"
-        output_path = os.path.join(output_dir, output_filename)
+        output_path = get_output_filename(input_file_path, suffix="-desilenced", output_dir=output_dir)
         
         # 确保输出目录存在
         ensure_dir_exists(output_dir)
@@ -300,14 +289,7 @@ def process_audio_mp(input_file_path, output_dir, min_silence_len, preset_thresh
                 processor = AudioProcessor(input_file_path)
                 audio = processor.audio
                 
-                from pydub.silence import split_on_silence
-                
-                chunks = split_on_silence(
-                    audio,
-                    min_silence_len=min_silence_len,
-                    silence_thresh=best_threshold,
-                    keep_silence=100
-                )
+                chunks = split_audio_by_silence(audio, min_silence_len, best_threshold)
                 
                 if not chunks:
                     # 清理临时文件

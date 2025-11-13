@@ -13,9 +13,9 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
-from silentcut.audio.processor import AudioProcessor, PRESET_THRESHOLDS
+from silentcut.audio.processor import AudioProcessor, PRESET_THRESHOLDS, split_audio_by_silence
 from silentcut.utils.logger import get_logger
-from silentcut.utils.file_utils import get_audio_files_in_directory, clean_temp_files
+from silentcut.utils.file_utils import get_audio_files_in_directory, clean_temp_files, get_output_filename
 
 # 获取日志记录器
 logger = get_logger("gui.desilencer_controller")
@@ -42,7 +42,6 @@ def test_threshold_task(args):
     
     try:
         from pydub import AudioSegment
-        from pydub.silence import split_on_silence
         import os
         
         # 读取音频文件
@@ -50,12 +49,7 @@ def test_threshold_task(args):
         input_size = os.path.getsize(input_file)
         
         # 使用指定阈值分割音频
-        chunks = split_on_silence(
-            audio,
-            min_silence_len=min_silence_len,
-            silence_thresh=threshold,
-            keep_silence=100  # 保留一小段静音，避免声音突然切换
-        )
+        chunks = split_audio_by_silence(audio, min_silence_len, threshold)
         
         if not chunks:
             return {
@@ -341,14 +335,7 @@ class Worker(QThread):
                 processor = AudioProcessor(input_file)
                 audio = processor.audio
                 
-                from pydub.silence import split_on_silence
-                
-                chunks = split_on_silence(
-                    audio,
-                    min_silence_len=self.min_silence_len,
-                    silence_thresh=best_threshold,
-                    keep_silence=100
-                )
+                chunks = split_audio_by_silence(audio, self.min_silence_len, best_threshold)
                 
                 if not chunks:
                     error_msg = f"使用最佳阈值 {best_threshold} dBFS 未检测到非静音片段"
@@ -356,10 +343,7 @@ class Worker(QThread):
                     return False, error_msg
                 
                 # 生成输出文件名
-                input_dir, input_filename = os.path.split(input_file)
-                name, ext = os.path.splitext(input_filename)
-                output_filename = f"{name}-desilenced{ext}"
-                output_path = os.path.join(output_dir, output_filename)
+                output_path = get_output_filename(input_file, suffix="-desilenced", output_dir=output_dir)
                 
                 # 合并并导出
                 output_audio = sum(chunks)

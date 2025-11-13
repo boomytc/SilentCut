@@ -4,10 +4,10 @@
 import os
 from pydub import AudioSegment
 from pydub.silence import split_on_silence
-import logging
+from silentcut.utils.logger import get_logger
+from silentcut.utils.file_utils import ensure_dir_exists, get_output_filename
 
-# 设置日志记录
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = get_logger("audio")
 
 # 阈值范围的最小和最大值 - 扩大范围
 MIN_THRESHOLD = -100  # 最严格的阈值
@@ -33,21 +33,21 @@ class AudioProcessor:
     def __init__(self, input_file):
         self.input_file = input_file
         self.audio = None
-        self.load_audio() # 初始化时加载音频
+        self.load_audio()
 
     def load_audio(self):
         """加载音频文件"""
         try:
-            logging.info(f"开始加载文件: {self.input_file}")
+            logger.info(f"开始加载文件: {self.input_file}")
             # 使用 from_file 尝试自动检测格式，而不是强制 from_wav
             self.audio = AudioSegment.from_file(self.input_file)
-            logging.info(f"文件加载成功: {self.input_file}")
+            logger.info(f"文件加载成功: {self.input_file}")
         except FileNotFoundError:
-            logging.error(f"错误: 文件未找到 {self.input_file}")
+            logger.error(f"错误: 文件未找到 {self.input_file}")
             self.audio = None
             raise
         except Exception as e:
-            logging.error(f"加载文件 {self.input_file} 时出错: {e}")
+            logger.error(f"加载文件 {self.input_file} 时出错: {e}")
             self.audio = None
             raise
 
@@ -64,7 +64,7 @@ class AudioProcessor:
             (success, message): 处理是否成功及相关信息
         """
         if self.audio is None:
-            logging.error("错误: 音频未加载，无法处理。")
+            logger.error("错误: 音频未加载，无法处理。")
             return False, "音频未加载"
 
         try:
@@ -72,24 +72,14 @@ class AudioProcessor:
             basename = os.path.basename(self.input_file)
             
             # --- 确定输出路径 ---
-            input_dir, input_filename = os.path.split(self.input_file)
-            name, ext = os.path.splitext(input_filename)
-            output_filename = f"{name}-desilenced{ext}"
-            
-            if output_folder and os.path.isdir(output_folder):
-                output_dir = output_folder
-                os.makedirs(output_dir, exist_ok=True)
-            else:
-                if output_folder:
-                    logging.warning(f"指定的输出文件夹 '{output_folder}' 无效或不是目录，将保存在输入文件旁边。")
-                output_dir = input_dir
-                
-            output_path = os.path.join(output_dir, output_filename)
+            output_path = get_output_filename(self.input_file, suffix="-desilenced", output_dir=output_folder)
+            out_dir = os.path.dirname(output_path)
+            ensure_dir_exists(out_dir)
             
             # --- 计算目标文件大小范围 ---
             min_acceptable_size = int(input_size * MIN_SIZE_RATIO)  # 最小可接受大小（原始大小的50%）
             max_acceptable_size = int(input_size * MAX_SIZE_RATIO)  # 最大可接受大小（原始大小的99%）
-            logging.info(f"目标文件大小范围: {min_acceptable_size} - {max_acceptable_size} bytes (原始: {input_size} bytes)")
+            logger.info(f"目标文件大小范围: {min_acceptable_size} - {max_acceptable_size} bytes (原始: {input_size} bytes)")
             
             # --- 计算初始自适应阈值 ---
             average_dbfs = self.audio.dBFS
@@ -116,7 +106,7 @@ class AudioProcessor:
                 # 如果无法计算特征，使用基于平均值的保守估计
                 initial_threshold = average_dbfs - ADAPTIVE_THRESHOLD_OFFSET
                 
-            logging.info(f"音频特征: 平均dBFS={average_dbfs:.1f}, 初始阈值={initial_threshold:.1f}")
+            logger.info(f"音频特征: 平均dBFS={average_dbfs:.1f}, 初始阈值={initial_threshold:.1f}")
             
             # --- 二分搜索最佳阈值 ---
             # 首先尝试预设阈值点，看是否有符合要求的
@@ -184,7 +174,7 @@ class AudioProcessor:
                     }
             
             # 尝试预设阈值点
-            logging.info("尝试预设阈值点...")
+            logger.info("尝试预设阈值点...")
             for preset in PRESET_THRESHOLDS:
                 result = test_threshold(preset, is_preset=True)
                 if result["status"] == "success":
@@ -202,7 +192,7 @@ class AudioProcessor:
                 logging.info(f"找到符合要求的预设阈值: {best_threshold:.1f} dBFS, 比例={best_result['ratio']:.2f}")
             else:
                 # 如果预设阈值都不符合要求，使用二分搜索
-                logging.info("预设阈值不符合要求，开始二分搜索...")
+                logger.info("预设阈值不符合要求，开始二分搜索...")
                 
                 # 初始化搜索范围
                 low = MIN_THRESHOLD
@@ -257,12 +247,12 @@ class AudioProcessor:
                                 best_result = result
                                 best_threshold = current_rounded
                                 best_audio = result["audio"]
-                                
-                                logging.info(f"找到符合要求的阈值: {best_threshold:.1f} dBFS, 比例={best_result['ratio']:.2f}")
-                                
+                                logger.info(
+                                    f"找到符合要求的阈值: {best_threshold:.1f} dBFS, 比例={best_result['ratio']:.2f}"
+                                )
                                 # 如果比例非常接近0.7，可以提前结束搜索
                                 if abs(result["ratio"] - 0.7) < 0.05:
-                                    logging.info("比例非常接近目标值，提前结束搜索")
+                                    logger.info("比例非常接近目标值，提前结束搜索")
                                     break
                         
                         # 根据结果调整搜索范围
@@ -270,29 +260,29 @@ class AudioProcessor:
                             # 文件太大，需要更严格的阈值（更小的dBFS值）
                             high = current
                             current = (low + current) / 2
-                            logging.info(f"文件太大 ({output_size} > {max_acceptable_size})，调整搜索范围: [{low:.1f}, {current:.1f}]")
+                            logger.info(f"文件太大 ({output_size} > {max_acceptable_size})，调整搜索范围: [{low:.1f}, {current:.1f}]")
                         elif output_size < min_acceptable_size:
                             # 文件太小，需要更宽松的阈值（更大的dBFS值）
                             low = current
                             current = (current + high) / 2
-                            logging.info(f"文件太小 ({output_size} < {min_acceptable_size})，调整搜索范围: [{current:.1f}, {high:.1f}]")
+                            logger.info(f"文件太小 ({output_size} < {min_acceptable_size})，调整搜索范围: [{current:.1f}, {high:.1f}]")
                     else:
                         # 处理失败，可能是阈值太严格，尝试更宽松的阈值
                         low = current
                         current = (current + high) / 2
-                        logging.info(f"处理失败，尝试更宽松的阈值: {current:.1f}")
+                        logger.info(f"处理失败，尝试更宽松的阈值: {current:.1f}")
                     
                     # 检查搜索范围是否已经很小
                     if high - low < 1:
-                        logging.info(f"搜索范围已经很小 ({low:.1f} - {high:.1f})，停止搜索")
+                        logger.info(f"搜索范围已经很小 ({low:.1f} - {high:.1f})，停止搜索")
                         break
                 
-                logging.info(f"搜索完成，共尝试 {attempts} 次，测试了 {len(tested_thresholds)} 个不同阈值")
+                logger.info(f"搜索完成，共尝试 {attempts} 次，测试了 {len(tested_thresholds)} 个不同阈值")
             
             # 检查是否找到符合要求的阈值
             if best_threshold is not None and best_audio is not None:
                 # 导出最终结果
-                logging.info(f"使用最佳阈值 {best_threshold:.1f} dBFS 导出最终结果: {output_path}")
+                logger.info(f"使用最佳阈值 {best_threshold:.1f} dBFS 导出最终结果: {output_path}")
                 best_audio.export(output_path, format="wav")
                 
                 # 检查最终文件大小
@@ -301,25 +291,25 @@ class AudioProcessor:
                 actual_reduction = ((input_size - final_size) / input_size * 100)
                 actual_retention = actual_ratio * 100
                 
-                logging.info(f"最终文件大小: {input_size} -> {final_size} bytes (减少: {actual_reduction:.2f}%, 保留: {actual_retention:.2f}%)")
+                logger.info(f"最终文件大小: {input_size} -> {final_size} bytes (减少: {actual_reduction:.2f}%, 保留: {actual_retention:.2f}%)")
                 
                 # 严格检查文件大小是否符合要求
                 if min_acceptable_size < final_size < input_size:
                     # 完全符合要求：小于原始大小但大于原始大小的50%
                     status_msg = "理想范围内"
-                    logging.info(f"最终结果完全符合要求: 大小比例 {actual_ratio:.2f} (介于 {MIN_SIZE_RATIO} 和 1.0 之间)")
+                    logger.info(f"最终结果完全符合要求: 大小比例 {actual_ratio:.2f} (介于 {MIN_SIZE_RATIO} 和 1.0 之间)")
                     
                     final_message = f"{output_path} (阈值: {best_threshold:.1f} dBFS, 大小: {input_size} -> {final_size} bytes, 减少: {actual_reduction:.2f}%, 保留: {actual_retention:.2f}%, {status_msg})"
-                    logging.info(f"处理成功完成: {final_message}")
+                    logger.info(f"处理成功完成: {final_message}")
                     return True, final_message
                     
                 elif final_size >= input_size:
                     # 处理后文件大小大于或等于原始文件，不符合要求
-                    logging.warning(f"最终结果大于或等于原始文件大小 ({final_size} >= {input_size} bytes)")
+                    logger.warning(f"最终结果大于或等于原始文件大小 ({final_size} >= {input_size} bytes)")
                     
                     # 如果非常接近原始大小（差距小于1%），仍然返回成功
                     if actual_ratio < 1.01:  # 允许1%的误差
-                        logging.info(f"文件大小非常接近原始大小，仍然返回成功")
+                        logger.info(f"文件大小非常接近原始大小，仍然返回成功")
                         final_message = f"{output_path} (阈值: {best_threshold:.1f} dBFS, 大小: {input_size} -> {final_size} bytes, 减少: {actual_reduction:.2f}%, 保留: {actual_retention:.2f}%)"
                         return True, final_message
                     
@@ -327,22 +317,22 @@ class AudioProcessor:
                     
                 elif final_size <= min_acceptable_size:
                     # 处理后文件大小小于原始文件的50%，不符合要求
-                    logging.warning(f"最终结果小于最小大小要求 ({final_size} <= {min_acceptable_size} bytes)")
+                    logger.warning(f"最终结果小于最小大小要求 ({final_size} <= {min_acceptable_size} bytes)")
                     
                     # 如果非常接近最小可接受大小（差距小于5%），仍然返回成功
                     if actual_ratio > MIN_SIZE_RATIO * 0.9:  # 如果大小超过最小限制的90%
-                        logging.info(f"文件大小接近最小限制，仍然返回成功")
+                        logger.info(f"文件大小接近最小限制，仍然返回成功")
                         final_message = f"{output_path} (阈值: {best_threshold:.1f} dBFS, 大小: {input_size} -> {final_size} bytes, 减少: {actual_reduction:.2f}%, 保留: {actual_retention:.2f}%)"
                         return True, final_message
                     
                     return False, f"无法保留足够的音频内容，最终结果仅保留了 {actual_retention:.2f}% 的原始内容，小于最小要求 {MIN_SIZE_RATIO*100}%"
             else:
                 # 没有找到有效的阈值
-                logging.warning(f"无法找到任何有效的阈值，放弃处理: {basename}")
+                logger.warning(f"无法找到任何有效的阈值，放弃处理: {basename}")
                 return False, f"无法找到合适的阈值处理文件 {basename}"
 
         except Exception as e:
-            logging.error(f"处理文件 {self.input_file} 时发生意外错误: {e}", exc_info=True)
+            logger.error(f"处理文件 {self.input_file} 时发生意外错误: {e}", exc_info=True)
             return False, f"处理错误: {e}"
 
 
@@ -358,3 +348,13 @@ if __name__ == '__main__':
             print(f"测试时出错: {e}")
     else:
         print(f"测试文件未找到: {test_file}")
+
+
+def split_audio_by_silence(audio, min_silence_len, threshold):
+    chunks = split_on_silence(
+        audio,
+        min_silence_len=min_silence_len,
+        silence_thresh=threshold,
+        keep_silence=100,
+    )
+    return chunks
