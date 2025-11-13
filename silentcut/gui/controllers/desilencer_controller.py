@@ -646,6 +646,7 @@ class DesilencerController:
         self.parallel_search_layout.setColumnStretch(2, 1)
         params_grid.addLayout(self.parallel_search_layout, 2, 0, 1, 3)
         self.vad_checkbox = QCheckBox("启用VAD语音检测")
+        self.vad_checkbox.toggled.connect(self._on_vad_toggled)
         params_grid.addWidget(self.vad_checkbox, 3, 0)
         self.vad_threshold_label = QLabel("VAD 阈值:")
         self.vad_threshold_spinbox = QDoubleSpinBox()
@@ -716,6 +717,7 @@ class DesilencerController:
                 item = self.parallel_search_layout.itemAt(i)
                 if item and item.widget():
                     item.widget().setVisible(True)
+            self._on_vad_toggled(self.vad_checkbox.isChecked())
         else:
             self.current_mode = 'batch'
             self.input_path_label.setText("输入目录:")
@@ -725,6 +727,7 @@ class DesilencerController:
                 item = self.parallel_search_layout.itemAt(i)
                 if item and item.widget():
                     item.widget().setVisible(False)
+            self._on_vad_toggled(self.vad_checkbox.isChecked())
     
     def toggle_mp_spinbox(self):
         """根据多进程复选框状态启用/禁用核心数微调框"""
@@ -810,10 +813,10 @@ class DesilencerController:
         
         # 参数设置
         self.silence_len_spinbox.setEnabled(enabled)
-        self.mp_checkbox.setEnabled(enabled)
-        self.mp_cores_spinbox.setEnabled(enabled and self.mp_checkbox.isChecked())
-        self.parallel_search_checkbox.setEnabled(enabled and self.current_mode == 'single')
-        self.thresholds_edit.setEnabled(enabled and self.current_mode == 'single')
+        self.mp_checkbox.setEnabled(enabled and not self.vad_checkbox.isChecked())
+        self.mp_cores_spinbox.setEnabled(enabled and self.mp_checkbox.isChecked() and not self.vad_checkbox.isChecked())
+        self.parallel_search_checkbox.setEnabled(enabled and self.current_mode == 'single' and not self.vad_checkbox.isChecked())
+        self.thresholds_edit.setEnabled(enabled and self.current_mode == 'single' and not self.vad_checkbox.isChecked())
         self.vad_checkbox.setEnabled(enabled)
         for w in [self.vad_threshold_label, self.vad_threshold_spinbox, self.vad_maxdur_label, self.vad_maxdur_spinbox, self.vad_minsil_label, self.vad_minsil_spinbox]:
             w.setEnabled(enabled and self.vad_checkbox.isChecked())
@@ -902,9 +905,12 @@ class DesilencerController:
         # 获取单文件并行搜索选项
         use_parallel_search = False
         use_vad = self.vad_checkbox.isChecked()
+        if use_vad:
+            use_mp = False
+            num_cores = 1
         preset_thresholds = []
         if self.current_mode == 'single':
-            use_parallel_search = self.parallel_search_checkbox.isChecked() and use_mp
+            use_parallel_search = self.parallel_search_checkbox.isChecked() and use_mp and not use_vad
             try:
                 # 解析阈值预设点
                 threshold_text = self.thresholds_edit.text().strip()
@@ -942,3 +948,19 @@ class DesilencerController:
         
         # 启动线程
         self.worker.start()
+    def _on_vad_toggled(self, checked):
+        is_single = (self.current_mode == 'single')
+        self.parallel_search_checkbox.setEnabled(is_single and not checked)
+        self.thresholds_edit.setEnabled(is_single and not checked)
+        for w in [self.vad_threshold_label, self.vad_threshold_spinbox, self.vad_maxdur_label, self.vad_maxdur_spinbox, self.vad_minsil_label, self.vad_minsil_spinbox]:
+            w.setEnabled(checked)
+    def _on_vad_toggled(self, checked):
+        is_single = (self.current_mode == 'single')
+        if checked and self.mp_checkbox.isChecked():
+            self.mp_checkbox.setChecked(False)
+        self.mp_checkbox.setEnabled(not checked)
+        self.mp_cores_spinbox.setEnabled(self.mp_checkbox.isChecked() and not checked)
+        self.parallel_search_checkbox.setEnabled(is_single and not checked)
+        self.thresholds_edit.setEnabled(is_single and not checked)
+        for w in [self.vad_threshold_label, self.vad_threshold_spinbox, self.vad_maxdur_label, self.vad_maxdur_spinbox, self.vad_minsil_label, self.vad_minsil_spinbox]:
+            w.setEnabled(checked)

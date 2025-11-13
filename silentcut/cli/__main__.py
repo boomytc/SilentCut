@@ -70,6 +70,8 @@ def process_batch(input_dir, output_dir=None, min_silence_len=500, use_vad=False
         ensure_dir_exists(output_dir)
     
     # 设置多进程
+    if use_vad:
+        use_multiprocessing = False
     if use_multiprocessing:
         if not max_workers:
             import multiprocessing

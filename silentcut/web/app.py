@@ -129,6 +129,10 @@ with st.sidebar:
     else:
         preset_thresholds = "-90,-80,-70,-60,-50,-40,-30,-20,-10"
         parallel_search = True
+    if use_vad:
+        parallel_search = False
+        enable_multiprocessing = False
+        max_workers = 1
     
     st.markdown("---")
     st.subheader("关于")
