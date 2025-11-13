@@ -2,6 +2,7 @@
 音频处理器模块 - 静音检测与切割核心算法
 """
 import os
+import logging
 from pydub import AudioSegment
 from pydub.silence import split_on_silence
 from silentcut.utils.logger import get_logger

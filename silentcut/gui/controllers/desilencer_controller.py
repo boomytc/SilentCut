@@ -7,7 +7,7 @@ import tempfile
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from PyQt6.QtWidgets import (
-    QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QLineEdit, QPushButton, 
+    QHBoxLayout, QGridLayout, QLabel, QLineEdit, QPushButton, 
     QFileDialog, QTextEdit, QSpinBox, QDoubleSpinBox, QProgressBar, QMessageBox,
     QRadioButton, QCheckBox, QGroupBox
 )

@@ -3,8 +3,6 @@
 """
 import os
 import tempfile
-import shutil
-from datetime import datetime
 
 
 def ensure_dir_exists(directory):

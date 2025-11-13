@@ -3,9 +3,8 @@
 """
 import os
 import librosa
-import numpy as np
 from PyQt6.QtWidgets import (
-    QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, 
+    QHBoxLayout, QPushButton, QFileDialog, 
     QLabel, QProgressBar, QMessageBox
 )
 from PyQt6.QtCore import QThread, pyqtSignal
