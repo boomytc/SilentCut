@@ -8,12 +8,10 @@ import librosa
 import librosa.display
 import numpy as np
 import matplotlib.pyplot as plt
-import soundfile as sf
 from datetime import datetime
 import warnings
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from functools import partial
 import time
 from pydub import AudioSegment
 import platform  # 新增，用于根据系统设置中文字体

@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, 
     QLabel, QProgressBar, QMessageBox
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import QThread, pyqtSignal
 
 from silentcut.gui.widgets import WaveformCanvas
 from silentcut.utils.logger import get_logger

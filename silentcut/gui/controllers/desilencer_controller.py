@@ -9,13 +9,13 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from PyQt6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, 
     QFileDialog, QTextEdit, QSpinBox, QProgressBar, QMessageBox,
-    QRadioButton, QButtonGroup, QCheckBox, QGroupBox
+    QRadioButton, QCheckBox, QGroupBox
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import QThread, pyqtSignal
 
 from silentcut.audio.processor import AudioProcessor, PRESET_THRESHOLDS, split_audio_by_silence
 from silentcut.utils.logger import get_logger
-from silentcut.utils.file_utils import get_audio_files_in_directory, clean_temp_files, get_output_filename
+from silentcut.utils.file_utils import get_audio_files_in_directory, get_output_filename
 
 # 获取日志记录器
 logger = get_logger("gui.desilencer_controller")

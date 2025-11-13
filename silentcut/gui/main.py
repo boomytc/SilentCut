@@ -2,7 +2,6 @@
 SilentCut GUI 主入口模块
 """
 import sys
-import os
 import multiprocessing
 import platform
 from PyQt6.QtWidgets import QApplication

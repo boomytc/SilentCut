@@ -5,7 +5,6 @@ from PyQt6.QtWidgets import (
     QMainWindow, QTabWidget, QWidget, QVBoxLayout, 
     QStatusBar, QLabel, QApplication
 )
-from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon, QAction
 import os
 import platform

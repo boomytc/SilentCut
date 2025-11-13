@@ -7,8 +7,8 @@ import argparse
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-from silentcut.audio.processor import AudioProcessor, PRESET_THRESHOLDS
-from silentcut.utils.logger import get_logger, setup_logger
+from silentcut.audio.processor import AudioProcessor
+from silentcut.utils.logger import get_logger
 from silentcut.utils.file_utils import get_audio_files_in_directory, ensure_dir_exists
 
 # 获取日志记录器
