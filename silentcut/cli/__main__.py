@@ -15,7 +15,9 @@ from silentcut.utils.file_utils import get_audio_files_in_directory, ensure_dir_
 logger = get_logger("cli")
 
 
-def process_single_file(input_file, output_dir=None, min_silence_len=500, verbose=False):
+def process_single_file(input_file, output_dir=None, min_silence_len=500, use_vad=False,
+                        vad_threshold=None, vad_min_silence_ms=None, vad_max_duration_ms=None,
+                        verbose=False):
     """处理单个音频文件"""
     try:
         # 设置日志级别
@@ -25,7 +27,14 @@ def process_single_file(input_file, output_dir=None, min_silence_len=500, verbos
         logger.info(f"处理文件: {input_file}")
         processor = AudioProcessor(input_file)
         start_time = time.time()
-        success, message = processor.process_audio(min_silence_len=min_silence_len, output_folder=output_dir)
+        success, message = processor.process_audio(
+            min_silence_len=min_silence_len,
+            output_folder=output_dir,
+            use_vad=use_vad,
+            vad_threshold=vad_threshold,
+            vad_min_silence_ms=vad_min_silence_ms,
+            vad_max_duration_ms=vad_max_duration_ms,
+        )
         elapsed_time = time.time() - start_time
         
         if success:
@@ -39,7 +48,9 @@ def process_single_file(input_file, output_dir=None, min_silence_len=500, verbos
         return False, str(e)
 
 
-def process_batch(input_dir, output_dir=None, min_silence_len=500, use_multiprocessing=True, max_workers=None, verbose=False):
+def process_batch(input_dir, output_dir=None, min_silence_len=500, use_vad=False,
+                  vad_threshold=None, vad_min_silence_ms=None, vad_max_duration_ms=None,
+                  use_multiprocessing=True, max_workers=None, verbose=False):
     """批量处理目录中的音频文件"""
     # 设置日志级别
     if verbose:
@@ -69,7 +80,19 @@ def process_batch(input_dir, output_dir=None, min_silence_len=500, use_multiproc
         # 并行处理所有文件
         results = []
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(process_single_file, file, output_dir, min_silence_len, verbose) for file in audio_files]
+            futures = [
+                executor.submit(
+                    process_single_file,
+                    file,
+                    output_dir,
+                    min_silence_len,
+                    use_vad,
+                    vad_threshold,
+                    vad_min_silence_ms,
+                    vad_max_duration_ms,
+                    verbose,
+                ) for file in audio_files
+            ]
             
             for i, future in enumerate(as_completed(futures)):
                 try:
@@ -88,7 +111,16 @@ def process_batch(input_dir, output_dir=None, min_silence_len=500, use_multiproc
         results = []
         
         for i, file in enumerate(audio_files):
-            success, message = process_single_file(file, output_dir, min_silence_len, verbose)
+            success, message = process_single_file(
+                file,
+                output_dir,
+                min_silence_len,
+                use_vad,
+                vad_threshold,
+                vad_min_silence_ms,
+                vad_max_duration_ms,
+                verbose,
+            )
             results.append((success, message))
             
             # 显示进度
@@ -117,6 +149,10 @@ def main():
     single_parser.add_argument("input", help="输入音频文件路径")
     single_parser.add_argument("-o", "--output-dir", help="输出目录路径")
     single_parser.add_argument("-l", "--min-silence-len", type=int, default=500, help="最小静音长度 (毫秒)")
+    single_parser.add_argument("--use-vad", action="store_true", help="使用VAD模式保留人声")
+    single_parser.add_argument("--vad-threshold", type=float, help="VAD 阈值")
+    single_parser.add_argument("--vad-min-silence-ms", type=int, help="VAD 段合并最小静音(ms)")
+    single_parser.add_argument("--vad-max-duration-ms", type=int, help="VAD 段最大时长(ms)")
     single_parser.add_argument("-v", "--verbose", action="store_true", help="显示详细日志")
     
     # 批处理命令
@@ -126,6 +162,10 @@ def main():
     batch_parser.add_argument("-l", "--min-silence-len", type=int, default=500, help="最小静音长度 (毫秒)")
     batch_parser.add_argument("-s", "--sequential", action="store_true", help="使用顺序处理 (不使用多进程)")
     batch_parser.add_argument("-w", "--workers", type=int, help="最大工作进程数")
+    batch_parser.add_argument("--use-vad", action="store_true", help="使用VAD模式保留人声")
+    batch_parser.add_argument("--vad-threshold", type=float, help="VAD 阈值")
+    batch_parser.add_argument("--vad-min-silence-ms", type=int, help="VAD 段合并最小静音(ms)")
+    batch_parser.add_argument("--vad-max-duration-ms", type=int, help="VAD 段最大时长(ms)")
     batch_parser.add_argument("-v", "--verbose", action="store_true", help="显示详细日志")
     
     # 解析命令行参数
@@ -144,7 +184,16 @@ def main():
             return
         
         # 处理单个文件
-        success, message = process_single_file(args.input, args.output_dir, args.min_silence_len, args.verbose)
+        success, message = process_single_file(
+            args.input,
+            args.output_dir,
+            args.min_silence_len,
+            args.use_vad,
+            args.vad_threshold,
+            args.vad_min_silence_ms,
+            args.vad_max_duration_ms,
+            args.verbose,
+        )
         
         # 显示处理结果
         if success:
@@ -165,6 +214,10 @@ def main():
             args.input_dir, 
             args.output_dir, 
             args.min_silence_len, 
+            args.use_vad,
+            args.vad_threshold,
+            args.vad_min_silence_ms,
+            args.vad_max_duration_ms,
             not args.sequential, 
             args.workers,
             args.verbose

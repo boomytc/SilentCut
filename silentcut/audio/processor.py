@@ -6,6 +6,7 @@ from pydub import AudioSegment
 from pydub.silence import split_on_silence
 from silentcut.utils.logger import get_logger
 from silentcut.utils.file_utils import ensure_dir_exists, get_output_filename
+from silentcut.utils.vad_detect import vad_detect
 
 logger = get_logger("audio")
 
@@ -51,7 +52,8 @@ class AudioProcessor:
             self.audio = None
             raise
 
-    def process_audio(self, min_silence_len=1000, output_folder=None):
+    def process_audio(self, min_silence_len=1000, output_folder=None, use_vad=False,
+                      vad_threshold=None, vad_min_silence_ms=None, vad_max_duration_ms=None):
         """
         处理音频文件，移除静音部分。
         使用自适应搜索策略，确保处理后文件大小严格小于原始文件但大于原始文件的50%。
@@ -80,6 +82,43 @@ class AudioProcessor:
             min_acceptable_size = int(input_size * MIN_SIZE_RATIO)  # 最小可接受大小（原始大小的50%）
             max_acceptable_size = int(input_size * MAX_SIZE_RATIO)  # 最大可接受大小（原始大小的99%）
             logger.info(f"目标文件大小范围: {min_acceptable_size} - {max_acceptable_size} bytes (原始: {input_size} bytes)")
+            if use_vad:
+                vad_kwargs = {}
+                if vad_threshold is not None:
+                    vad_kwargs["threshold"] = vad_threshold
+                if vad_min_silence_ms is not None:
+                    vad_kwargs["min_silence_ms"] = vad_min_silence_ms
+                else:
+                    vad_kwargs["min_silence_ms"] = min_silence_len
+                if vad_max_duration_ms is not None:
+                    vad_kwargs["max_duration_ms"] = vad_max_duration_ms
+
+                segments_info = vad_detect(self.input_file, **vad_kwargs)
+                segments = []
+                for item in segments_info:
+                    for start_ms, end_ms in item.get("value", []):
+                        segment = self.audio[start_ms:end_ms]
+                        segments.append(segment)
+                if not segments:
+                    return False, f"无法找到语音片段处理文件 {basename}"
+                output_audio = sum(segments)
+                output_audio.export(output_path, format="wav")
+                final_size = os.path.getsize(output_path)
+                actual_ratio = final_size / input_size
+                actual_reduction = ((input_size - final_size) / input_size * 100)
+                if min_acceptable_size < final_size < input_size:
+                    final_message = f"{output_path} (模式: VAD, 大小: {input_size} -> {final_size} bytes, 减少: {actual_reduction:.2f}%, 保留: {actual_ratio*100:.2f}%)"
+                    return True, final_message
+                if final_size >= input_size:
+                    if actual_ratio < 1.01:
+                        final_message = f"{output_path} (模式: VAD, 大小: {input_size} -> {final_size} bytes, 减少: {actual_reduction:.2f}%, 保留: {actual_ratio*100:.2f}%)"
+                        return True, final_message
+                    return False, f"无法使文件 {basename} 变小，最终结果为原始大小的 {actual_ratio:.2f} 倍"
+                if final_size <= min_acceptable_size:
+                    if actual_ratio > MIN_SIZE_RATIO * 0.9:
+                        final_message = f"{output_path} (模式: VAD, 大小: {input_size} -> {final_size} bytes, 减少: {actual_reduction:.2f}%, 保留: {actual_ratio*100:.2f}%)"
+                        return True, final_message
+                    return False, f"无法保留足够的音频内容，最终结果仅保留了 {actual_ratio*100:.2f}% 的原始内容，小于最小要求 {MIN_SIZE_RATIO*100}%"
             
             # --- 计算初始自适应阈值 ---
             average_dbfs = self.audio.dBFS

@@ -8,7 +8,7 @@ import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from PyQt6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, 
-    QFileDialog, QTextEdit, QSpinBox, QProgressBar, QMessageBox,
+    QFileDialog, QTextEdit, QSpinBox, QDoubleSpinBox, QProgressBar, QMessageBox,
     QRadioButton, QCheckBox, QGroupBox
 )
 from PyQt6.QtCore import QThread, pyqtSignal
@@ -102,7 +102,8 @@ class Worker(QThread):
     
     def __init__(self, mode, input_path, output_dir, min_silence_len,
                  use_multiprocessing=False, num_cores=1, 
-                 use_parallel_search=False, preset_thresholds=None):
+                 use_parallel_search=False, preset_thresholds=None, use_vad=False,
+                 vad_threshold=None, vad_min_silence_ms=None, vad_max_duration_ms=None):
         """初始化工作线程"""
         super().__init__()
         self.mode = mode  # 'single' 或 'batch'
@@ -114,6 +115,10 @@ class Worker(QThread):
         self.use_parallel_search = use_parallel_search
         self.preset_thresholds = preset_thresholds or PRESET_THRESHOLDS
         self.running = True  # 控制线程运行
+        self.use_vad = use_vad
+        self.vad_threshold = vad_threshold
+        self.vad_min_silence_ms = vad_min_silence_ms
+        self.vad_max_duration_ms = vad_max_duration_ms
     
     def process_single_file(self, input_file):
         """处理单个文件的逻辑"""
@@ -121,7 +126,7 @@ class Worker(QThread):
         self._ensure_output_dir()
         
         # 根据是否使用并行搜索选择处理方法
-        if self.use_parallel_search:
+        if self.use_parallel_search and not self.use_vad:
             return self.process_single_file_parallel(input_file, self.output_dir)
         else:
             return self.process_single_file_standard(input_file, self.output_dir)
@@ -166,7 +171,11 @@ class Worker(QThread):
             processor = AudioProcessor(input_file)
             success, message = processor.process_audio(
                 min_silence_len=self.min_silence_len,
-                output_folder=output_dir
+                output_folder=output_dir,
+                use_vad=self.use_vad,
+                vad_threshold=self.vad_threshold,
+                vad_min_silence_ms=self.vad_min_silence_ms,
+                vad_max_duration_ms=self.vad_max_duration_ms,
             )
             
             # 处理完成，计算时间
@@ -667,6 +676,31 @@ class DesilencerController:
         self.parallel_search_layout.addWidget(self.thresholds_label)
         self.parallel_search_layout.addWidget(self.thresholds_edit, 1)
         params_layout.addLayout(self.parallel_search_layout)
+
+        self.vad_checkbox = QCheckBox("启用VAD语音检测")
+        params_layout.addWidget(self.vad_checkbox)
+
+        vad_params_layout = QHBoxLayout()
+        self.vad_threshold_label = QLabel("VAD 阈值:")
+        self.vad_threshold_spinbox = QDoubleSpinBox()
+        self.vad_threshold_spinbox.setRange(0.0, 1.0)
+        self.vad_threshold_spinbox.setSingleStep(0.05)
+        self.vad_threshold_spinbox.setValue(0.5)
+        self.vad_maxdur_label = QLabel("VAD 最大段时长(ms):")
+        self.vad_maxdur_spinbox = QSpinBox()
+        self.vad_maxdur_spinbox.setRange(1000, 30000)
+        self.vad_maxdur_spinbox.setValue(5000)
+        self.vad_minsil_label = QLabel("VAD 最小静音(ms):")
+        self.vad_minsil_spinbox = QSpinBox()
+        self.vad_minsil_spinbox.setRange(0, 5000)
+        self.vad_minsil_spinbox.setValue(1000)
+        vad_params_layout.addWidget(self.vad_threshold_label)
+        vad_params_layout.addWidget(self.vad_threshold_spinbox)
+        vad_params_layout.addWidget(self.vad_maxdur_label)
+        vad_params_layout.addWidget(self.vad_maxdur_spinbox)
+        vad_params_layout.addWidget(self.vad_minsil_label)
+        vad_params_layout.addWidget(self.vad_minsil_spinbox)
+        params_layout.addLayout(vad_params_layout)
         
         # 设置参数组
         params_group.setLayout(params_layout)
@@ -826,6 +860,9 @@ class DesilencerController:
         self.mp_cores_spinbox.setEnabled(enabled and self.mp_checkbox.isChecked())
         self.parallel_search_checkbox.setEnabled(enabled and self.current_mode == 'single')
         self.thresholds_edit.setEnabled(enabled and self.current_mode == 'single')
+        self.vad_checkbox.setEnabled(enabled)
+        for w in [self.vad_threshold_label, self.vad_threshold_spinbox, self.vad_maxdur_label, self.vad_maxdur_spinbox, self.vad_minsil_label, self.vad_minsil_spinbox]:
+            w.setEnabled(enabled and self.vad_checkbox.isChecked())
     
     def start_processing(self):
         """开始处理音频"""
@@ -910,6 +947,7 @@ class DesilencerController:
         
         # 获取单文件并行搜索选项
         use_parallel_search = False
+        use_vad = self.vad_checkbox.isChecked()
         preset_thresholds = []
         if self.current_mode == 'single':
             use_parallel_search = self.parallel_search_checkbox.isChecked() and use_mp
@@ -922,6 +960,10 @@ class DesilencerController:
                 self.log("警告：阈值预设点格式无效，将使用默认值")
                 preset_thresholds = PRESET_THRESHOLDS
         
+        vad_threshold = self.vad_threshold_spinbox.value() if use_vad else None
+        vad_max_duration_ms = self.vad_maxdur_spinbox.value() if use_vad else None
+        vad_min_silence_ms = self.vad_minsil_spinbox.value() if use_vad else None
+
         # 创建并启动工作线程
         self.worker = Worker(
             mode=self.current_mode,
@@ -931,7 +973,11 @@ class DesilencerController:
             use_multiprocessing=use_mp,
             num_cores=num_cores,
             use_parallel_search=use_parallel_search,
-            preset_thresholds=preset_thresholds
+            preset_thresholds=preset_thresholds,
+            use_vad=use_vad,
+            vad_threshold=vad_threshold,
+            vad_min_silence_ms=vad_min_silence_ms,
+            vad_max_duration_ms=vad_max_duration_ms,
         )
         
         # 连接信号

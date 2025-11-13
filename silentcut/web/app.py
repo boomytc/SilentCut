@@ -18,6 +18,7 @@ import platform  # 新增，用于根据系统设置中文字体
 
 # 导入 SilentCut 核心模块
 from silentcut.audio.processor import AudioProcessor, split_audio_by_silence
+from silentcut.utils.vad_detect import vad_detect
 from silentcut.utils.logger import get_logger
 from silentcut.utils.file_utils import ensure_dir_exists, clean_temp_files, get_output_filename
 
@@ -103,6 +104,10 @@ with st.sidebar:
         max_workers = 1
         
     st.markdown("---")
+    use_vad = st.checkbox("启用VAD语音检测模式", value=False)
+    vad_threshold = st.slider("VAD 阈值", min_value=0.0, max_value=1.0, value=0.5, step=0.05)
+    vad_max_duration_ms = st.slider("VAD 最大段时长 (ms)", min_value=1000, max_value=30000, value=5000, step=500)
+    vad_min_silence_ms = st.slider("VAD 最小静音 (ms)", min_value=0, max_value=5000, value=1000, step=100)
     st.subheader("高级参数")
     
     # 添加阈值搜索参数
@@ -213,7 +218,8 @@ def test_threshold_task(input_file_path, min_silence_len, threshold, output_dir)
 
 
 # 多进程处理函数
-def process_audio_mp(input_file_path, output_dir, min_silence_len, preset_thresholds_str, max_workers=4, use_parallel_search=True):
+def process_audio_mp(input_file_path, output_dir, min_silence_len, preset_thresholds_str, max_workers=4, use_parallel_search=True, use_vad=False,
+                     vad_threshold=None, vad_min_silence_ms=None, vad_max_duration_ms=None):
     """使用多进程处理音频文件"""
     start_time = time.time()
     
@@ -238,6 +244,35 @@ def process_audio_mp(input_file_path, output_dir, min_silence_len, preset_thresh
         logger.info(f"处理文件: {basename}")
         logger.info(f"使用预设阈值点: {preset_thresholds}")
         
+        # 如果启用VAD
+        if use_vad:
+            ensure_dir_exists(output_dir)
+            output_path = get_output_filename(input_file_path, suffix="-desilenced", output_dir=output_dir)
+            processor = AudioProcessor(input_file_path)
+            audio = processor.audio
+            vad_kwargs = {}
+            if vad_threshold is not None:
+                vad_kwargs["threshold"] = vad_threshold
+            vad_kwargs["min_silence_ms"] = vad_min_silence_ms if vad_min_silence_ms is not None else min_silence_len
+            if vad_max_duration_ms is not None:
+                vad_kwargs["max_duration_ms"] = vad_max_duration_ms
+            info = vad_detect(input_file_path, **vad_kwargs)
+            segments = []
+            for item in info:
+                for start_ms, end_ms in item.get("value", []):
+                    segments.append(audio[start_ms:end_ms])
+            if not segments:
+                return False, f"未找到语音片段处理文件 {basename}", None
+            output_audio = sum(segments)
+            output_audio.export(output_path, format="wav")
+            final_size = os.path.getsize(output_path)
+            actual_ratio = final_size / input_size
+            actual_reduction = ((input_size - final_size) / input_size * 100)
+            result_message = (
+                f"处理完成，输出文件: {output_path} "
+                f"(模式: VAD, 比例 {actual_ratio:.2f}, 减少: {actual_reduction:.2f}%)"
+            )
+            return True, result_message, output_path
         # 如果启用并行搜索，使用多进程测试所有阈值点
         if use_parallel_search:
             # 准备阈值测试任务
@@ -507,12 +542,23 @@ if uploaded_file is not None:
                         min_silence_len, 
                         preset_thresholds,
                         max_workers=max_workers,
-                        use_parallel_search=parallel_search
+                        use_parallel_search=parallel_search,
+                        use_vad=use_vad,
+                        vad_threshold=vad_threshold,
+                        vad_min_silence_ms=vad_min_silence_ms,
+                        vad_max_duration_ms=vad_max_duration_ms,
                     )
                 else:
                     # 使用单进程方式处理
                     processor = AudioProcessor(input_file_path)
-                    success, message = processor.process_audio(min_silence_len=min_silence_len, output_folder=temp_dir)
+                    success, message = processor.process_audio(
+                        min_silence_len=min_silence_len,
+                        output_folder=temp_dir,
+                        use_vad=use_vad,
+                        vad_threshold=vad_threshold,
+                        vad_min_silence_ms=vad_min_silence_ms,
+                        vad_max_duration_ms=vad_max_duration_ms,
+                    )
                     
                     # 获取处理后的文件路径
                     file_name_without_ext = os.path.splitext(uploaded_file.name)[0]
