@@ -20,6 +20,11 @@ SilentCut 专注于自动检测并移除音频中的静音段，适用于播客�
 ```bash
 git clone https://github.com/boomytc/SilentCut.git
 cd SilentCut
+
+# 开发模式安装（推荐）
+pip install -e .
+
+# 或仅安装依赖
 pip install -r requirements.txt
 
 # GUI
@@ -93,4 +98,3 @@ SilentCut/
 - 处理后体积变大：现已按输入格式导出；如输入是 `wav`（无压缩）仍可能体积较大，可考虑使用压缩格式源文件
 - 语音段过碎：调大 VAD 的 `min_silence_ms` 或设置 `max_duration_ms` 合并段
 - 阈值模式找不到有效阈值：调整 `min_silence_len` 或扩展预设阈值范围
-
