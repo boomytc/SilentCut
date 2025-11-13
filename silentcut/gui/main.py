@@ -4,7 +4,7 @@ SilentCut GUI 主入口模块
 import sys
 import multiprocessing
 import platform
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtGui import QFont
 
 # 导入 SilentCut 模块
@@ -17,6 +17,7 @@ logger = get_logger("gui")
 from silentcut.gui.views.main_window import MainWindow
 from silentcut.gui.controllers.desilencer_controller import DesilencerController
 from silentcut.gui.controllers.waveform_controller import WaveformController
+from silentcut.utils.file_utils import is_ffmpeg_available
 
 
 def main():
@@ -35,6 +36,10 @@ def main():
     
     # 创建应用程序
     app = QApplication(sys.argv)
+
+    if not is_ffmpeg_available():
+        QMessageBox.critical(None, "环境错误", "未检测到 ffmpeg。请安装后重试。macOS 可使用 'brew install ffmpeg'，Linux 使用发行版包管理器，Windows 安装官方构建并加入 PATH。")
+        sys.exit(1)
     
     # 设置全局字体（可选）
     # 根据平台选择合适的字体

@@ -15,7 +15,7 @@ import platform
 
 from silentcut.audio.processor import AudioProcessor
 from silentcut.utils.logger import get_logger
-from silentcut.utils.file_utils import ensure_dir_exists, get_output_filename
+from silentcut.utils.file_utils import ensure_dir_exists, get_output_filename, is_ffmpeg_available
 
 logger = get_logger("web")
 
@@ -53,6 +53,10 @@ st.set_page_config(
     page_icon="🔊",
     layout="wide",
 )
+
+if not is_ffmpeg_available():
+    st.error("未检测到 ffmpeg。请安装后重试。macOS 可使用 'brew install ffmpeg'，Linux 使用发行版包管理器，Windows 安装官方构建并加入 PATH。")
+    st.stop()
 
 st.title("🔊 SilentCut - 音频静音切割工具")
 st.markdown("上传音频文件，自动检测并移除静音片段，并可视化比对处理前后的结果。")

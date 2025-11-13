@@ -3,6 +3,7 @@
 """
 import os
 import tempfile
+from pydub.utils import which
 
 
 def ensure_dir_exists(directory):
@@ -122,3 +123,6 @@ def get_file_size_info(file_path):
     size_mb = size_kb / 1024
     
     return size_bytes, size_kb, size_mb
+
+def is_ffmpeg_available():
+    return bool(which("ffmpeg") or which("avconv"))

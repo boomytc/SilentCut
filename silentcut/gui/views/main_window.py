@@ -32,10 +32,11 @@ class MainWindow(QMainWindow):
             self.setWindowIcon(QIcon(icon_path))
         
         # 创建状态栏
-        self.statusBar = QStatusBar()
-        self.setStatusBar(self.statusBar)
-        self.statusLabel = QLabel("就绪")
-        self.statusBar.addWidget(self.statusLabel)
+        status_bar = QStatusBar()
+        self.setStatusBar(status_bar)
+        self.status_bar = status_bar
+        self.status_label = QLabel("就绪")
+        self.status_bar.addWidget(self.status_label)
         
         # 创建标签页控件
         self.tabs = QTabWidget()
@@ -117,14 +118,14 @@ class MainWindow(QMainWindow):
         from silentcut.utils.cleanup import cleanup_temp_files
         
         # 在状态栏显示正在清理
-        self.statusLabel.setText("正在清理临时文件...")
+        self.status_label.setText("正在清理临时文件...")
         QApplication.processEvents()
         
         # 清理临时文件
         count = cleanup_temp_files()
         
         # 更新状态栏
-        self.statusLabel.setText(f"已清理 {count} 个临时文件")
+        self.status_label.setText(f"已清理 {count} 个临时文件")
     
     def _show_about(self):
         """显示关于对话框"""
@@ -149,4 +150,4 @@ class MainWindow(QMainWindow):
     
     def show_status_message(self, message):
         """在状态栏显示消息"""
-        self.statusLabel.setText(message)
+        self.status_label.setText(message)

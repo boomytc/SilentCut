@@ -8,7 +8,7 @@ import time
 
 from silentcut.audio.processor import AudioProcessor
 from silentcut.utils.logger import get_logger
-from silentcut.utils.file_utils import get_audio_files_in_directory, ensure_dir_exists
+from silentcut.utils.file_utils import get_audio_files_in_directory, ensure_dir_exists, is_ffmpeg_available
 
 # 获取日志记录器
 logger = get_logger("cli")
@@ -121,7 +121,11 @@ def main():
     
     # 解析命令行参数
     args = parser.parse_args()
-    
+
+    if not is_ffmpeg_available():
+        print("错误: 未检测到 ffmpeg。请安装后重试。例如: macOS 使用 'brew install ffmpeg'，Linux 使用发行版包管理器，Windows 安装官方构建并将其加入 PATH。")
+        sys.exit(1)
+
     # 如果没有指定命令，显示帮助信息
     if not args.command:
         parser.print_help()
