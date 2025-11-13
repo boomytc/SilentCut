@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "silentcut"
+version = "0.1.0"
+description = "一个高效的音频静音切割工具"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "SilentCut Team", email = "example@example.com" }]
+urls = { homepage = "https://github.com/yourusername/silentcut" }
+dependencies = [
+  "pydub>=0.25.1",
+  "librosa>=0.9.0",
+  "numpy>=1.20.0",
+  "matplotlib>=3.4.0",
+  "PyQt6>=6.2.0",
+  "streamlit>=1.10.0",
+  "soundfile>=0.10.3",
+]
+
+[project.scripts]
+silentcut = "silentcut.cli.__main__:main"
+silentcut-gui = "silentcut.gui.main:main"
+silentcut-web = "silentcut_web:main"
+
+[tool.setuptools.packages.find]
+include = ["silentcut*"]
+
+[tool.setuptools]
+include-package-data = true
+

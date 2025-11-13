@@ -24,7 +24,10 @@
 git clone https://github.com/boomytc/SilentCut.git
 cd SilentCut
 
-# 安装依赖
+# 安装本地包（开发模式，推荐）
+pip install -e .
+
+# 或仅安装依赖
 pip install -r requirements.txt
 
 # 运行GUI界面
@@ -103,7 +106,7 @@ SilentCut/
 ├─ silentcut_gui.py      # GUI启动脚本
 ├─ silentcut_web.py      # Web启动脚本
 ├─ silentcut_cli.py      # CLI启动脚本
-├─ setup.py              # 安装配置
+├─ pyproject.toml        # 现代打包配置
 └─ README.md             # 文档
 ```
 
