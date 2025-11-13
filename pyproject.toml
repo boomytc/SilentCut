@@ -9,8 +9,8 @@ description = "一个高效的音频静音切割工具"
 readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
-authors = [{ name = "SilentCut Team", email = "example@example.com" }]
-urls = { homepage = "https://github.com/yourusername/silentcut" }
+authors = [{ name = "SilentCut Team", email = "boomytc@outlook.com" }]
+urls = { homepage = "https://github.com/boomytc/SilentCut" }
 dependencies = [
   "pydub>=0.25.1",
   "librosa>=0.9.0",
