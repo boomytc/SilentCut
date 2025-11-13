@@ -3,6 +3,7 @@ import sys
 import tempfile
 import shutil
 from .logger import get_logger
+from .file_utils import get_project_tmp_dir
 
 logger = get_logger("cleanup")
 
@@ -45,6 +46,33 @@ def _remove_silentcut_temp_dirs():
         logger.error(f"删除系统临时目录时出错: {e}")
     return removed
 
+def _remove_workspace_temp_dirs():
+    base = get_project_tmp_dir()
+    removed = 0
+    try:
+        for name in os.listdir(base):
+            dir_path = os.path.join(base, name)
+            if os.path.isdir(dir_path):
+                file_count = 0
+                for _r, _d, _f in os.walk(dir_path):
+                    file_count += len(_f)
+                shutil.rmtree(dir_path, ignore_errors=True)
+                removed += file_count
+                logger.info(f"已删除临时目录: {dir_path}")
+            else:
+                try:
+                    os.remove(dir_path)
+                    removed += 1
+                    logger.info(f"已删除临时文件: {dir_path}")
+                except Exception as e:
+                    logger.error(f"删除文件 {dir_path} 时出错: {e}")
+    except Exception as e:
+        logger.error(f"删除工作区临时目录时出错: {e}")
+    return removed
+
+def cleanup_workspace_temp():
+    return _remove_workspace_temp_dirs()
+
 def cleanup_temp_files(directory=None):
     if directory is None:
         directory = os.getcwd()
@@ -60,6 +88,7 @@ def cleanup_temp_files(directory=None):
                 removed += _remove_file(fpath)
                 logger.info(f"已删除: {os.path.relpath(fpath, directory)}")
 
+    removed += _remove_workspace_temp_dirs()
     removed += _remove_silentcut_temp_dirs()
     return removed
 

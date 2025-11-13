@@ -61,7 +61,8 @@ if not is_ffmpeg_available():
 st.title("🔊 SilentCut - 音频静音切割工具")
 st.markdown("上传音频文件，自动检测并移除静音片段，并可视化比对处理前后的结果。")
 
-temp_dir = tempfile.mkdtemp()
+from silentcut.utils.file_utils import create_temp_directory, get_project_tmp_dir
+temp_dir = create_temp_directory(prefix="web_")
 
 with st.sidebar:
     st.header("参数设置")

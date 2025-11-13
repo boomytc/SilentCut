@@ -3,6 +3,7 @@
 """
 import os
 import tempfile
+import uuid
 from pydub.utils import which
 
 
@@ -53,17 +54,20 @@ def get_format_codec_from_path(file_path):
     return "wav", None, "wav"
 
 
+def get_project_root():
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
+def get_project_tmp_dir():
+    tmp_dir = os.path.join(get_project_root(), "tmp")
+    os.makedirs(tmp_dir, exist_ok=True)
+    return tmp_dir
+
 def create_temp_directory(prefix="silentcut_"):
-    """
-    创建临时目录
-    
-    Args:
-        prefix: 临时目录名称前缀
-        
-    Returns:
-        临时目录路径
-    """
-    return tempfile.mkdtemp(prefix=prefix)
+    base = get_project_tmp_dir()
+    name = f"{prefix}{uuid.uuid4().hex}"
+    path = os.path.join(base, name)
+    os.makedirs(path, exist_ok=True)
+    return path
 
 
 def clean_temp_files(file_list):
