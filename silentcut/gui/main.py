@@ -4,8 +4,8 @@ SilentCut GUI 主入口模块
 import sys
 import multiprocessing
 import platform
-from PyQt6.QtWidgets import QApplication, QMessageBox
-from PyQt6.QtGui import QFont
+from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtGui import QFont
 
 # 导入 SilentCut 模块
 from silentcut.utils.logger import get_logger

@@ -3,12 +3,12 @@
 """
 import os
 import time
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QHBoxLayout, QGridLayout, QLabel, QLineEdit, QPushButton, 
     QFileDialog, QTextEdit, QSpinBox, QDoubleSpinBox, QProgressBar, QMessageBox,
     QRadioButton, QGroupBox
 )
-from PyQt6.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 
 from silentcut.audio.processor import AudioProcessor
 from silentcut.utils.logger import get_logger
@@ -19,10 +19,10 @@ logger = get_logger("gui.desilencer_controller")
 
 class Worker(QThread):
     """处理音频的工作线程，避免冻结 GUI"""
-    progress_signal = pyqtSignal(int) # 进度信号 (0-100 for batch, 0/100 for single)
-    log_signal = pyqtSignal(str)      # 日志信号
-    finished_signal = pyqtSignal(bool, str) # 完成信号 (success, message)
-    processing_detail_signal = pyqtSignal(dict) # 音频处理详细信息信号
+    progress_signal = Signal(int) # 进度信号 (0-100 for batch, 0/100 for single)
+    log_signal = Signal(str)      # 日志信号
+    finished_signal = Signal(bool, str) # 完成信号 (success, message)
+    processing_detail_signal = Signal(dict) # 音频处理详细信息信号
     
     def __init__(self, mode, input_path, output_dir,
                  vad_threshold=0.5, vad_min_silence_ms=1000, vad_max_duration_ms=5000):

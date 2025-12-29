@@ -1,7 +1,7 @@
 """
 自定义 Matplotlib 画布小部件，用于在 PyQt6 中显示波形图
 """
-from PyQt6.QtWidgets import QWidget, QVBoxLayout
+from PySide6.QtWidgets import QWidget, QVBoxLayout
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 import numpy as np

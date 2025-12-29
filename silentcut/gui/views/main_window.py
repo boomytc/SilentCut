@@ -1,11 +1,11 @@
 """
 SilentCut 主窗口视图模块
 """
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QMainWindow, QTabWidget, QWidget, QVBoxLayout, 
     QStatusBar, QLabel, QApplication
 )
-from PyQt6.QtGui import QIcon, QAction
+from PySide6.QtGui import QIcon, QAction
 import os
 import platform
 
@@ -129,7 +129,7 @@ class MainWindow(QMainWindow):
     
     def _show_about(self):
         """显示关于对话框"""
-        from PyQt6.QtWidgets import QMessageBox
+        from PySide6.QtWidgets import QMessageBox
         
         QMessageBox.about(
             self,

@@ -1,3 +1,3 @@
 """
-SilentCut GUI 模块 - PyQt6 桌面界面
+SilentCut GUI 模块 - PySide6 桌面界面
 """
